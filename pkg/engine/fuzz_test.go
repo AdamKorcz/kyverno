@@ -36,7 +36,7 @@ import (
 	"github.com/kyverno/kyverno/pkg/imageverifycache"
 	"github.com/kyverno/kyverno/pkg/registryclient"
 	kubeutils "github.com/kyverno/kyverno/pkg/utils/kube"
-
+	engineapi "github.com/kyverno/kyverno/pkg/engine/api"
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 )
 
@@ -461,11 +461,144 @@ func FuzzEngineValidateTest(f *testing.F) {
 			t.Skip()
 		}
 
-		validateEngine.Validate(
+		er := validateEngine.Validate(
 			validateContext,
 			pc.WithPolicy(policy),
 		)
+		panic("Here")
+		failurePolicy := kyverno.Fail
+		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
+		if blocked == false {
+			panic("blocked = false")
+		}
 	})
+}
+
+var (
+	rawBypassPolicy = []byte(`{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "validate-image"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "validate-tag",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "An image tag is required",
+					"pattern": {
+					   "spec": {
+						  "containers": [
+							 {
+								"image": "*:*"
+							 }
+						  ]
+					   }
+					}
+				 }
+			  },
+			  {
+				 "name": "validate-latest",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "If the image has 'latest' tag then imagePullPolicy must be 'Always'",
+					"pattern": {
+					   "spec": {
+						  "containers": [
+							 {
+								"(image)": "*latest",
+								"imagePullPolicy": "Always"
+							 }
+						  ]
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }
+	`)
+)
+
+func FuzzPolicyBypassTest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ff := fuzz.NewConsumer(data)
+
+		resourceUnstructured, err := createUnstructuredObject(ff)
+		if err != nil {
+			return
+		}
+		//var shouldPass bool
+		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
+		for k, _ := range objSpec {
+			if strings.Contains(k, "c") {
+				if strings.Contains(k, "co") {
+					if strings.Contains(k, "con") {
+						if strings.Contains(k, "cont") {
+							if strings.Contains(k, "conta") {
+								if strings.Contains(k, "contai") {
+									if strings.Contains(k, "contain") {
+										if strings.Contains(k, "containe") {
+											if strings.Contains(k, "container") {
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if containers, ok := objSpec["containers"]; ok {
+			t.Fatalf("res: %+v\n", resourceUnstructured.Object["spec"])
+			if _, ok := containers.([]map[string]interface{}); !ok {
+				t.Fatalf("Incorrect type")
+			}
+		}
+		/*
+		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
+		if err != nil {
+			t.Skip()
+		}
+
+		er := validateEngine.Validate(
+			validateContext,
+			pc.WithPolicy(policy),
+		)
+		panic("Here")
+		failurePolicy := kyverno.Fail
+		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
+		if blocked == false {
+			panic("blocked = false")
+		}*/
+	})
+}
+
+func blockRequest(engineResponses []engineapi.EngineResponse, failurePolicy kyverno.FailurePolicyType) bool {
+	for _, er := range engineResponses {
+		if er.IsFailed() && er.GetValidationFailureAction().Enforce() {
+			return true
+		}
+		if er.IsError() && failurePolicy == kyverno.Fail {
+			return true
+		}
+	}
+	return false
 }
 
 func GetK8sString(ff *fuzz.ConsumeFuzzer) (string, error) {
