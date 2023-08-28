@@ -523,7 +523,7 @@ var (
 								"(image)": "*latest",
 								"imagePullPolicy": "Always"
 							 }
-						  ]
+						  ]containers.([]map[string]interface{})
 					   }
 					}
 				 }
@@ -536,56 +536,98 @@ var (
 
 func FuzzPolicyBypassTest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
+
 		ff := fuzz.NewConsumer(data)
 
 		resourceUnstructured, err := createUnstructuredObject(ff)
 		if err != nil {
 			return
 		}
-		//var shouldPass bool
 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
 		for k, _ := range objSpec {
-			if strings.Contains(k, "c") {
-				if strings.Contains(k, "co") {
-					if strings.Contains(k, "con") {
-						if strings.Contains(k, "cont") {
-							if strings.Contains(k, "conta") {
-								if strings.Contains(k, "contai") {
-									if strings.Contains(k, "contain") {
-										if strings.Contains(k, "containe") {
-											if strings.Contains(k, "container") {
-											}
-										}
-									}
-								}
-							}
+			if !strings.Contains(k, "c") {
+				return
+			}
+			if !strings.Contains(k, "co") {
+				return
+			}
+			if !strings.Contains(k, "con") {
+				return
+			}
+			if !strings.Contains(k, "cont") {
+				return
+			}
+			if !strings.Contains(k, "conta") {
+				return
+			}
+			if !strings.Contains(k, "contai") {
+				return
+			}
+			if !strings.Contains(k, "contain") {
+				return
+			}
+			if !strings.Contains(k, "containe") {
+				return
+			}
+			if !strings.Contains(k, "container") {
+				return
+			}
+		}
+
+		if _, ok := objSpec["containers"]; !ok {
+			return
+		}
+		containers := objSpec["containers"]
+
+
+		// DEBUGGING:
+		t.Fatalf("res: %+v\n", resourceUnstructured.Object["spec"])
+		if _, ok := containers.([]map[string]interface{}); !ok {
+			panic("incorrect")
+			return
+		}
+
+		var shouldPass bool
+		shouldPass = true
+
+		for _, container := range containers.([]map[string]interface{}) {
+			if _, ok := container["image"]; ok {
+				if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
+					if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
+						if imagePullPolicy.(string) != "Always" {
+							shouldPass = false
 						}
+					} else {
+						shouldPass = false
 					}
+				} else {
+					shouldPass = false
 				}
+			} else {
+				shouldPass = false
 			}
 		}
-		if containers, ok := objSpec["containers"]; ok {
-			t.Fatalf("res: %+v\n", resourceUnstructured.Object["spec"])
-			if _, ok := containers.([]map[string]interface{}); !ok {
-				t.Fatalf("Incorrect type")
-			}
-		}
-		/*
+		
 		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
 		if err != nil {
 			t.Skip()
 		}
 
+		var policy kyverno.ClusterPolicy
+		err = json.Unmarshal(rawBypassPolicy, &policy)
+		if err != nil {
+			panic(err)
+		}
+
 		er := validateEngine.Validate(
 			validateContext,
-			pc.WithPolicy(policy),
+			pc.WithPolicy(&policy),
 		)
-		panic("Here")
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked == false {
-			panic("blocked = false")
-		}*/
+		if blocked != shouldPass {
+			panic("blocked != shouldPass")
+		}
 	})
 }
 
