@@ -474,8 +474,8 @@ func FuzzEngineValidateTest(f *testing.F) {
 	})
 }
 
-var (
-	rawBypassPolicy = []byte(`{
+func LatestImageTagPolicy() []byte {
+	policy := `{
 		"apiVersion": "kyverno.io/v1",
 		"kind": "ClusterPolicy",
 		"metadata": {
@@ -523,7 +523,7 @@ var (
 								"(image)": "*latest",
 								"imagePullPolicy": "Always"
 							 }
-						  ]containers.([]map[string]interface{})
+						  ]
 					   }
 					}
 				 }
@@ -531,8 +531,31 @@ var (
 		   ]
 		}
 	 }
-	`)
-)
+	`
+	return []byte(policy)
+}
+
+// Accepts the containers spec
+func ShouldBlockImageTag(containers []map[string]interface{}) bool {
+	for _, container := range containers {
+		if _, ok := container["image"]; ok {
+			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
+				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
+					if imagePullPolicy.(string) != "Always" {
+						return true
+					}
+				} else {
+					return true
+				}
+			} else {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
+	return false
+}
 
 func FuzzPolicyBypassTest(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
@@ -543,36 +566,12 @@ func FuzzPolicyBypassTest(f *testing.F) {
 		if err != nil {
 			return
 		}
-		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
-		for k, _ := range objSpec {
-			if !strings.Contains(k, "c") {
-				return
-			}
-			if !strings.Contains(k, "co") {
-				return
-			}
-			if !strings.Contains(k, "con") {
-				return
-			}
-			if !strings.Contains(k, "cont") {
-				return
-			}
-			if !strings.Contains(k, "conta") {
-				return
-			}
-			if !strings.Contains(k, "contai") {
-				return
-			}
-			if !strings.Contains(k, "contain") {
-				return
-			}
-			if !strings.Contains(k, "containe") {
-				return
-			}
-			if !strings.Contains(k, "container") {
-				return
-			}
+		resourceType := resourceUnstructured.Object["kind"]
+		if resourceType != "Pod" {
+			return
 		}
+ 		//panic(fmt.Sprintf("%+v\n", resourceUnstructured))
+ 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
 
 		if _, ok := objSpec["containers"]; !ok {
 			return
@@ -587,34 +586,16 @@ func FuzzPolicyBypassTest(f *testing.F) {
 			return
 		}
 
-		var shouldPass bool
-		shouldPass = true
-
-		for _, container := range containers.([]map[string]interface{}) {
-			if _, ok := container["image"]; ok {
-				if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
-					if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
-						if imagePullPolicy.(string) != "Always" {
-							shouldPass = false
-						}
-					} else {
-						shouldPass = false
-					}
-				} else {
-					shouldPass = false
-				}
-			} else {
-				shouldPass = false
-			}
-		}
+ 		shouldBlock := ShouldBlockImageTag(containers.([]map[string]interface{}))
 		
 		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
 		if err != nil {
 			t.Skip()
 		}
 
+		rawPolicy := LatestImageTagPolicy()
 		var policy kyverno.ClusterPolicy
-		err = json.Unmarshal(rawBypassPolicy, &policy)
+		err = json.Unmarshal(rawPolicy, &policy)
 		if err != nil {
 			panic(err)
 		}
@@ -625,8 +606,8 @@ func FuzzPolicyBypassTest(f *testing.F) {
 		)
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked != shouldPass {
-			panic("blocked != shouldPass")
+		if blocked != shouldBlock {
+			panic("blocked != shouldBlock")
 		}
 	})
 }
