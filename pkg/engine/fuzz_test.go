@@ -550,8 +550,6 @@ func ShouldBlockImageTag(containers []map[string]interface{}) bool {
 			} else {
 				return true
 			}
-		} else {
-			return true
 		}
 	}
 	return false
@@ -580,7 +578,6 @@ func FuzzPolicyBypassTest(f *testing.F) {
 
 
 		// DEBUGGING:
-		t.Fatalf("res: %+v\n", resourceUnstructured.Object["spec"])
 		if _, ok := containers.([]map[string]interface{}); !ok {
 			panic("incorrect")
 			return
@@ -609,6 +606,332 @@ func FuzzPolicyBypassTest(f *testing.F) {
 		if blocked != shouldBlock {
 			panic("blocked != shouldBlock")
 		}
+		panic("Hereeeeeeeeeeee")
+	})
+}
+
+// Accepts the volumes
+func ShouldBlockEquality(volumes []map[string]interface{}) bool {
+	for _, volume := range volumes {
+		if hostpath, ok := volume["hostpath"]; ok {			
+			if hostpath.(string) == "/var/lib" {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
+	return false
+}
+
+func EqualityHostpathPolicy() []byte {
+	return []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "validate-host-path"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "validate-host-path",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "Host path '/var/lib/' is not allowed",
+					"pattern": {
+					   "spec": {
+						  "volumes": [
+							 {
+								"=(hostPath)": {
+								   "path": "!/var/lib"
+								}
+							 }
+						  ]
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }
+	 `)
+}
+
+func FuzzEqualityTest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+
+		ff := fuzz.NewConsumer(data)
+
+		resourceUnstructured, err := createUnstructuredObject(ff)
+		if err != nil {
+			return
+		}
+		resourceType := resourceUnstructured.Object["kind"]
+		if resourceType != "Pod" {
+			return
+		}
+ 		//panic(fmt.Sprintf("%+v\n", resourceUnstructured))
+ 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
+
+		if _, ok := objSpec["volumes"]; !ok {
+			return
+		}
+		volumes := objSpec["volumes"]
+
+
+		// DEBUGGING:
+		if _, ok := volumes.([]map[string]interface{}); !ok {
+			panic("incorrect")
+			return
+		}
+
+ 		shouldBlock := ShouldBlockEquality(volumes.([]map[string]interface{}))
+		
+		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
+		if err != nil {
+			t.Skip()
+		}
+
+		rawPolicy := LatestImageTagPolicy()
+		var policy kyverno.ClusterPolicy
+		err = json.Unmarshal(rawPolicy, &policy)
+		if err != nil {
+			panic(err)
+		}
+
+		er := validateEngine.Validate(
+			validateContext,
+			pc.WithPolicy(&policy),
+		)
+		failurePolicy := kyverno.Fail
+		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
+		if blocked != shouldBlock {
+			panic("blocked != shouldBlock")
+		}
+		panic("Hereeeeeeeeeeee")
+	})
+}
+
+// Accepts the spec
+func ShouldBlockSecurityPolicy(spec map[string]interface{}) bool {
+	if _, ok := spec["securityContext"]; !ok {
+		return false
+	}
+	sc := spec["securityContext"].(map[string]interface{})
+	if _, ok := sc["runAsNonRoot"]; !ok {
+		return true
+	}
+	runAsNonRoot := sc["runAsNonRoot"].(string)
+	if runAsNonRoot != "true" {
+		return true
+	}
+	return false
+}
+
+func SecurityContextPolicy() []byte {
+	return []byte(`{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "pod rule 2",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "pod: validate run as non root user",
+					"pattern": {
+					   "spec": {
+						  "=(securityContext)": {
+							 "runAsNonRoot": true
+						  }
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }	 `)
+}
+
+func FuzzSecurityPolicyTest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+
+		ff := fuzz.NewConsumer(data)
+
+		resourceUnstructured, err := createUnstructuredObject(ff)
+		if err != nil {
+			return
+		}
+		resourceType := resourceUnstructured.Object["kind"]
+		if resourceType != "Pod" {
+			return
+		}
+ 		//panic(fmt.Sprintf("%+v\n", resourceUnstructured))
+ 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
+
+		if _, ok := objSpec["spec"]; !ok {
+			return
+		}
+		spec := objSpec["spec"]
+
+
+		// DEBUGGING:
+		if _, ok := spec.(map[string]interface{}); !ok {
+			panic("incorrect")
+			return
+		}
+
+ 		shouldBlock := ShouldBlockSecurityPolicy(spec.(map[string]interface{}))
+		
+		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
+		if err != nil {
+			t.Skip()
+		}
+
+		rawPolicy := LatestImageTagPolicy()
+		var policy kyverno.ClusterPolicy
+		err = json.Unmarshal(rawPolicy, &policy)
+		if err != nil {
+			panic(err)
+		}
+
+		er := validateEngine.Validate(
+			validateContext,
+			pc.WithPolicy(&policy),
+		)
+		failurePolicy := kyverno.Fail
+		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
+		if blocked != shouldBlock {
+			panic("blocked != shouldBlock")
+		}
+		panic("Hereeeeeeeeeeee")
+	})
+}
+
+// Accepts the containers spec
+func ShouldBlockContainerName(containers []map[string]interface{}) bool {
+	for _, container := range containers {
+		if name, ok := container["name"]; ok {
+			if name != "nginx" {
+				return true
+			}
+		} else {
+			return true
+		}
+	}
+	return false
+}
+
+func ContainerNamePolicy() []byte {
+	return []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		  "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		  "rules": [
+			{
+			  "name": "pod image rule",
+			  "match": {
+				"resources": {
+				  "kinds": [
+					"Pod"
+				  ]
+				}
+			  },
+			  "validate": {
+				"pattern": {
+				  "spec": {
+					"=(containers)": [
+					  {
+						"name": "nginx"
+					  }
+					]
+				  }
+				}
+			  }
+			}
+		  ]
+		}
+	  }
+		 `)
+}
+
+func FuzzContainerNameTest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+
+		ff := fuzz.NewConsumer(data)
+
+		resourceUnstructured, err := createUnstructuredObject(ff)
+		if err != nil {
+			return
+		}
+		resourceType := resourceUnstructured.Object["kind"]
+		if resourceType != "Pod" {
+			return
+		}
+ 		//panic(fmt.Sprintf("%+v\n", resourceUnstructured))
+ 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
+
+		if _, ok := objSpec["spec"]; !ok {
+			return
+		}
+		spec := objSpec["spec"]
+
+
+		// DEBUGGING:
+		if _, ok := spec.(map[string]interface{}); !ok {
+			panic("incorrect")
+			return
+		}
+
+		if _, ok := spec.(map[string]interface{})["containers"].([]map[string]interface{}); !ok {
+			panic("Incorrect")
+		}
+		containers := spec.(map[string]interface{})["containers"].([]map[string]interface{})
+
+ 		shouldBlock := ShouldBlockContainerName(containers)
+		
+		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
+		if err != nil {
+			t.Skip()
+		}
+
+		rawPolicy := ContainerNamePolicy()
+		var policy kyverno.ClusterPolicy
+		err = json.Unmarshal(rawPolicy, &policy)
+		if err != nil {
+			panic(err)
+		}
+
+		er := validateEngine.Validate(
+			validateContext,
+			pc.WithPolicy(&policy),
+		)
+		failurePolicy := kyverno.Fail
+		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
+		if blocked != shouldBlock {
+			panic("blocked != shouldBlock")
+		}
+		panic("Hereeeeeeeeeeee")
 	})
 }
 
