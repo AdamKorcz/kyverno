@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	corev1 "k8s.io/api/core/v1"
 
 	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -473,77 +474,6 @@ func FuzzEngineValidateTest(f *testing.F) {
 		}
 	})
 }
-// Accepts the objSpec
-func ShouldBlockImageTag(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-	if _, ok := spec["containers"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	containers := spec["containers"].([]map[string]interface{})
-
-	for _, container := range containers {
-		if _, ok := container["image"]; ok {
-			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
-				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
-					if imagePullPolicy.(string) != "Always" {
-						return true, nil
-					}
-				} else {
-					return true, nil
-				}
-			} else {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
-// Accepts the objSpec
-func ShouldBlockEquality(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["volumes"]; !ok {
-		return false, fmt.Errorf("No volumes")
-	}
-	volumes := objSpec["volumes"].([]map[string]interface{})
-	for _, volume := range volumes {
-		if hostpath, ok := volume["hostpath"]; ok {
-			if hostpath.(string) == "/var/lib" {
-				return true, nil
-			}
-		} else {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-var (
-	
-)
-
-// Accepts the objSpec
-func ShouldBlockSecurityPolicy(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No security context")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-
-	if _, ok := spec["securityContext"]; !ok {
-		return false, fmt.Errorf("No security context")
-	}
-	sc := spec["securityContext"].(map[string]interface{})
-	if _, ok := sc["runAsNonRoot"]; !ok {
-		return true, nil
-	}
-	runAsNonRoot := sc["runAsNonRoot"].(string)
-	if runAsNonRoot != "true" {
-		return true, nil
-	}
-	return false, nil
-}
 
 var (
 	latestImageTagPolicy = []byte(`{
@@ -708,7 +638,7 @@ var (
 )
 
 // Accepts the containers spec
-func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
+/*func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
 	if _, ok := objSpec["spec"]; !ok {
 		return false, fmt.Errorf("No containers found")
 	}
@@ -732,6 +662,129 @@ func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
 		}
 	}
 	return false, nil
+}*/
+
+func ShouldBlockContainerName(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
+		return false, fmt.Errorf("No containers found")
+	}
+	containers := pod.Spec.Containers
+
+	for _, container := range containers {
+		if container.Name != "nginx" {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	}
+	return true, nil
+}
+
+func ShouldBlockImageTag(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
+		return false, fmt.Errorf("No containers found")
+	}
+	containers := pod.Spec.Containers
+
+	for _, container := range containers {
+		if _, ok := strings.CutSuffix(container.Image, "latest"); ok {
+			if container.ImagePullPolicy == "Always" {
+				return false, nil
+			} else {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+// Accepts the objSpec
+/*func ShouldBlockImageTag(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["spec"]; !ok {
+		return false, fmt.Errorf("No spec")
+	}
+	spec := objSpec["spec"].(map[string]interface{})
+	if _, ok := spec["containers"]; !ok {
+		return false, fmt.Errorf("No spec")
+	}
+	containers := spec["containers"].([]map[string]interface{})
+
+	for _, container := range containers {
+		if _, ok := container["image"]; ok {
+			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
+				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
+					if imagePullPolicy.(string) != "Always" {
+						return true, nil
+					}
+				} else {
+					return true, nil
+				}
+			} else {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}*/
+
+// Accepts the objSpec
+/*func ShouldBlockEquality(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["volumes"]; !ok {
+		return false, fmt.Errorf("No volumes")
+	}
+	volumes := objSpec["volumes"].([]map[string]interface{})
+	for _, volume := range volumes {
+		if hostpath, ok := volume["hostpath"]; ok {
+			if hostpath.(string) == "/var/lib" {
+				return true, nil
+			}
+		} else {
+			return true, nil
+		}
+	}
+	return false, nil
+}*/
+
+func ShouldBlockEquality(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 {
+		return false, fmt.Errorf("No volumes found")
+	}
+	volumes := pod.Spec.Volumes
+
+	for _, volume := range volumes {
+		if volume.VolumeSource.HostPath != nil {
+			if volume.VolumeSource.HostPath.Path == "/var/lib" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// if there is a security policy, then RunAsNonRoot must be true
+func ShouldBlockSecurityPolicy(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.SecurityContext == nil {
+		return false, nil
+	}
+
+	securityContext := pod.Spec.SecurityContext
+
+	if securityContext.RunAsNonRoot == nil {
+		return true, nil
+	}
+
+	if *securityContext.RunAsNonRoot != true {
+		return true, nil
+	} else {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func getPod(ff *fuzz.ConsumeFuzzer) (*corev1.Pod, error) {
+	pod := &corev1.Pod{}
+	err := ff.GenerateStruct(pod)
+	return pod, err
 }
 
 var (
@@ -742,22 +795,22 @@ var (
 )
 
 func init() {
-	cp1 := &kyverno.ClusterPolicy{}
+	cp1 = &kyverno.ClusterPolicy{}
 	err := json.Unmarshal(containerNamePolicy, cp1)
 	if err != nil {
 		panic(err)
 	}
-	cp2 := &kyverno.ClusterPolicy{}
+	cp2 = &kyverno.ClusterPolicy{}
 	err = json.Unmarshal(latestImageTagPolicy, cp2)
 	if err != nil {
 		panic(err)
 	}
-	cp3 := &kyverno.ClusterPolicy{}
+	cp3 = &kyverno.ClusterPolicy{}
 	err = json.Unmarshal(securityContextPolicy, cp3)
 	if err != nil {
 		panic(err)
 	}
-	cp4 := &kyverno.ClusterPolicy{}
+	cp4 = &kyverno.ClusterPolicy{}
 	err = json.Unmarshal(equalityHostpathPolicy, cp4)
 	if err != nil {
 		panic(err)
@@ -766,7 +819,7 @@ func init() {
 
 type BypassChecker struct {
 	resourceType string
-	shouldBlock func(map[string]interface{}) (bool, error)
+	shouldBlock func(*corev1.Pod) (bool, error)
 	clusterPolicy *kyverno.ClusterPolicy
 }
 
@@ -799,8 +852,14 @@ func FuzzContainerNameTest(f *testing.F) {
 			checker.resourceType = "Pod"
 			checker.clusterPolicy = cp4
 		}
+		pod, err := getPod(ff)
+		if err != nil {
+			return
+		}
 
-		resourceUnstructured, err := createUnstructuredObject(ff, checker.resourceType)
+		fmt.Printf("Created pod: \n%+v\n", pod)
+
+		/*resourceUnstructured, err := createUnstructuredObject(ff, checker.resourceType)
 		if err != nil {
 			return
 		}
@@ -809,14 +868,24 @@ func FuzzContainerNameTest(f *testing.F) {
 			return
 		}
 
- 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
+ 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})*/
 
 		/*if _, ok := objSpec["spec"]; !ok {
 			return
 		}
 		spec := objSpec["spec"]*/
 
-		shouldBlock, err := checker.shouldBlock(objSpec)
+		shouldBlock, err := checker.shouldBlock(pod)
+		if err != nil {
+			return
+		}
+
+		resource, err := json.MarshalIndent(pod, "", "  ")
+		if err != nil {
+			return
+		}
+
+		resourceUnstructured, err := kubeutils.BytesToUnstructured(resource)
 		if err != nil {
 			return
 		}
@@ -831,8 +900,8 @@ func FuzzContainerNameTest(f *testing.F) {
 		)
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked != shouldBlock {
-			panic("blocked != shouldBlock")
+		if blocked == shouldBlock {
+			panic(fmt.Sprintf("\nDid not block a resource that should be blocked:\n%s\n should have been blocked by \n%+v", string(resource), checker.clusterPolicy))
 		}
 	})
 }
