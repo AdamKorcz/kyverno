@@ -123,7 +123,7 @@ func buildFuzzContext(ff *fuzz.ConsumeFuzzer) (*PolicyContext, error) {
 		return nil, fmt.Errorf("No rules created")
 	}
 
-	resourceUnstructured, err := createUnstructuredObject(ff)
+	resourceUnstructured, err := createUnstructuredObject(ff, "")
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func buildFuzzContext(ff *fuzz.ConsumeFuzzer) (*PolicyContext, error) {
 	}
 
 	if addOldResource {
-		oldResourceUnstructured, err := createUnstructuredObject(ff)
+		oldResourceUnstructured, err := createUnstructuredObject(ff, "")
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +451,7 @@ func FuzzEngineValidateTest(f *testing.F) {
 			return
 		}
 
-		resourceUnstructured, err := createUnstructuredObject(ff)
+		resourceUnstructured, err := createUnstructuredObject(ff, "")
 		if err != nil {
 			return
 		}
@@ -472,6 +472,77 @@ func FuzzEngineValidateTest(f *testing.F) {
 			panic("blocked = false")
 		}
 	})
+}
+// Accepts the objSpec
+func ShouldBlockImageTag(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["spec"]; !ok {
+		return false, fmt.Errorf("No spec")
+	}
+	spec := objSpec["spec"].(map[string]interface{})
+	if _, ok := spec["containers"]; !ok {
+		return false, fmt.Errorf("No spec")
+	}
+	containers := spec["containers"].([]map[string]interface{})
+
+	for _, container := range containers {
+		if _, ok := container["image"]; ok {
+			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
+				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
+					if imagePullPolicy.(string) != "Always" {
+						return true, nil
+					}
+				} else {
+					return true, nil
+				}
+			} else {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// Accepts the objSpec
+func ShouldBlockEquality(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["volumes"]; !ok {
+		return false, fmt.Errorf("No volumes")
+	}
+	volumes := objSpec["volumes"].([]map[string]interface{})
+	for _, volume := range volumes {
+		if hostpath, ok := volume["hostpath"]; ok {
+			if hostpath.(string) == "/var/lib" {
+				return true, nil
+			}
+		} else {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+var (
+	
+)
+
+// Accepts the objSpec
+func ShouldBlockSecurityPolicy(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["spec"]; !ok {
+		return false, fmt.Errorf("No security context")
+	}
+	spec := objSpec["spec"].(map[string]interface{})
+
+	if _, ok := spec["securityContext"]; !ok {
+		return false, fmt.Errorf("No security context")
+	}
+	sc := spec["securityContext"].(map[string]interface{})
+	if _, ok := sc["runAsNonRoot"]; !ok {
+		return true, nil
+	}
+	runAsNonRoot := sc["runAsNonRoot"].(string)
+	if runAsNonRoot != "true" {
+		return true, nil
+	}
+	return false, nil
 }
 
 var (
@@ -532,56 +603,6 @@ var (
 		}
 	 }
 	`)
-)
-
-// Accepts the containers spec
-func ShouldBlockImageTag(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-	if _, ok := spec["containers"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	containers := spec["containers"].([]map[string]interface{})
-
-	for _, container := range containers {
-		if _, ok := container["image"]; ok {
-			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
-				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
-					if imagePullPolicy.(string) != "Always" {
-						return true, nil
-					}
-				} else {
-					return true, nil
-				}
-			} else {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}
-
-// Accepts the volumes
-func ShouldBlockEquality(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["volumes"]; !ok {
-		return false, fmt.Errorf("No volumes")
-	}
-	volumes := objSpec["volumes"].([]map[string]interface{})
-	for _, volume := range volumes {
-		if hostpath, ok := volume["hostpath"]; ok {
-			if hostpath.(string) == "/var/lib" {
-				return true, nil
-			}
-		} else {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-var (
 	equalityHostpathPolicy = []byte(`
 	{
 		"apiVersion": "kyverno.io/v1",
@@ -619,85 +640,6 @@ var (
 		}
 	 }
 	 `)
-)
-
-/*func FuzzEqualityTest(f *testing.F) {
-	f.Fuzz(func(t *testing.T, data []byte) {
-
-		ff := fuzz.NewConsumer(data)
-
-		resourceUnstructured, err := createUnstructuredObject(ff)
-		if err != nil {
-			return
-		}
-		resourceType := resourceUnstructured.Object["kind"]
-		if resourceType != "Pod" {
-			return
-		}
- 		//panic(fmt.Sprintf("%+v\n", resourceUnstructured))
- 		objSpec := resourceUnstructured.Object["spec"].(map[string]interface{})
-
-		if _, ok := objSpec["volumes"]; !ok {
-			return
-		}
-		volumes := objSpec["volumes"]
-
-
-		// DEBUGGING:
-		if _, ok := volumes.([]map[string]interface{}); !ok {
-			panic("incorrect")
-			return
-		}
-
- 		shouldBlock := ShouldBlockEquality(volumes.([]map[string]interface{}))
-		
-		pc, err := NewPolicyContext(fuzzJp, *resourceUnstructured, kyverno.Create, nil, fuzzCfg)
-		if err != nil {
-			t.Skip()
-		}
-
-		rawPolicy := latestImageTagPolicy
-		var policy kyverno.ClusterPolicy
-		err = json.Unmarshal(rawPolicy, &policy)
-		if err != nil {
-			panic(err)
-		}
-
-		er := validateEngine.Validate(
-			validateContext,
-			pc.WithPolicy(&policy),
-		)
-		failurePolicy := kyverno.Fail
-		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked != shouldBlock {
-			panic("blocked != shouldBlock")
-		}
-		panic("Hereeeeeeeeeeee")
-	})
-}*/
-
-// Accepts the spec
-func ShouldBlockSecurityPolicy(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No security context")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-
-	if _, ok := spec["securityContext"]; !ok {
-		return false, fmt.Errorf("No security context")
-	}
-	sc := spec["securityContext"].(map[string]interface{})
-	if _, ok := sc["runAsNonRoot"]; !ok {
-		return true, nil
-	}
-	runAsNonRoot := sc["runAsNonRoot"].(string)
-	if runAsNonRoot != "true" {
-		return true, nil
-	}
-	return false, nil
-}
-
-var (
 	securityContextPolicy = []byte(`{
 		"apiVersion": "kyverno.io/v1",
 		"kind": "ClusterPolicy",
@@ -728,37 +670,8 @@ var (
 			  }
 		   ]
 		}
-	 }	 `)
-)
+	 }`)
 
-// Accepts the containers spec
-func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No containers found")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-
-	if _, ok := spec["containers"]; !ok {
-		return false, fmt.Errorf("No containers found")
-	}
-
-	if _, ok := spec["containers"].([]map[string]interface{}); !ok {
-		panic("Incorrect")
-	}
-	containers := spec["containers"].([]map[string]interface{})
-	for _, container := range containers {
-		if name, ok := container["name"]; ok {
-			if name != "nginx" {
-				return true, nil
-			}
-		} else {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-var (
 	containerNamePolicy = []byte(`
 	{
 		"apiVersion": "kyverno.io/v1",
@@ -791,14 +704,70 @@ var (
 			}
 		  ]
 		}
-	  }
-		 `)
+	  }`)
 )
+
+// Accepts the containers spec
+func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
+	if _, ok := objSpec["spec"]; !ok {
+		return false, fmt.Errorf("No containers found")
+	}
+	spec := objSpec["spec"].(map[string]interface{})
+
+	if _, ok := spec["containers"]; !ok {
+		return false, fmt.Errorf("No containers found")
+	}
+
+	if _, ok := spec["containers"].([]map[string]interface{}); !ok {
+		panic("Incorrect")
+	}
+	containers := spec["containers"].([]map[string]interface{})
+	for _, container := range containers {
+		if name, ok := container["name"]; ok {
+			if name != "nginx" {
+				return true, nil
+			}
+		} else {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+var (
+	cp1 *kyverno.ClusterPolicy
+	cp2 *kyverno.ClusterPolicy
+	cp3 *kyverno.ClusterPolicy
+	cp4 *kyverno.ClusterPolicy
+)
+
+func init() {
+	cp1 := &kyverno.ClusterPolicy{}
+	err := json.Unmarshal(containerNamePolicy, cp1)
+	if err != nil {
+		panic(err)
+	}
+	cp2 := &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(latestImageTagPolicy, cp2)
+	if err != nil {
+		panic(err)
+	}
+	cp3 := &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(securityContextPolicy, cp3)
+	if err != nil {
+		panic(err)
+	}
+	cp4 := &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(equalityHostpathPolicy, cp4)
+	if err != nil {
+		panic(err)
+	}
+}
 
 type BypassChecker struct {
 	resourceType string
 	shouldBlock func(map[string]interface{}) (bool, error)
-	policy []byte
+	clusterPolicy *kyverno.ClusterPolicy
 }
 
 func FuzzContainerNameTest(f *testing.F) {
@@ -815,23 +784,23 @@ func FuzzContainerNameTest(f *testing.F) {
 		switch policyToCheck%4 {
 		case 0:
 			checker.shouldBlock = ShouldBlockContainerName
-			checker.policy = containerNamePolicy
 			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp1
 		case 1:
 			checker.shouldBlock = ShouldBlockImageTag
-			checker.policy = latestImageTagPolicy
 			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp2
 		case 2:
 			checker.shouldBlock = ShouldBlockSecurityPolicy
 			checker.resourceType = "Pod"
-			checker.policy = securityContextPolicy
+			checker.clusterPolicy = cp3
 		case 3:
 			checker.shouldBlock = ShouldBlockEquality
 			checker.resourceType = "Pod"
-			checker.policy = equalityHostpathPolicy
+			checker.clusterPolicy = cp4
 		}
 
-		resourceUnstructured, err := createUnstructuredObject(ff)
+		resourceUnstructured, err := createUnstructuredObject(ff, checker.resourceType)
 		if err != nil {
 			return
 		}
@@ -856,18 +825,9 @@ func FuzzContainerNameTest(f *testing.F) {
 		if err != nil {
 			t.Skip()
 		}
-
-		rawPolicy := checker.policy
-
-		var policy kyverno.ClusterPolicy
-		err = json.Unmarshal(rawPolicy, &policy)
-		if err != nil {
-			panic(err)
-		}
-
 		er := validateEngine.Validate(
 			validateContext,
-			pc.WithPolicy(&policy),
+			pc.WithPolicy(checker.clusterPolicy),
 		)
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
@@ -906,13 +866,23 @@ func GetK8sString(ff *fuzz.ConsumeFuzzer) (string, error) {
 	return sb.String(), nil
 }
 
-func getVersionAndKind(ff *fuzz.ConsumeFuzzer) (string, error) {
-	kindToCreate, err := ff.GetInt()
-	if err != nil {
-		return "", err
+func getVersionAndKind(ff *fuzz.ConsumeFuzzer, typeToCreate string) (string, error) {
+	var k, v string
+	if typeToCreate == "" {
+		kindToCreate, err := ff.GetInt()
+		if err != nil {
+			return "", err
+		}
+		k = k8sKinds[kindToCreate%len(k8sKinds)]
+	} else {
+		k = typeToCreate
+		if _, ok := kindToVersion[k]; !ok {
+			panic("Type not found")
+		}
 	}
-	k := k8sKinds[kindToCreate%len(k8sKinds)]
-	v := kindToVersion[k]
+
+	v = kindToVersion[k]
+
 	var sb strings.Builder
 	sb.WriteString("\"apiVersion\": \"")
 	sb.WriteString(v)
@@ -951,13 +921,13 @@ func createLabels(ff *fuzz.ConsumeFuzzer) (string, error) {
 }
 
 // Creates an unstructured k8s object
-func createUnstructuredObject(f *fuzz.ConsumeFuzzer) (*unstructured.Unstructured, error) {
+func createUnstructuredObject(f *fuzz.ConsumeFuzzer, typeToCreate string) (*unstructured.Unstructured, error) {
 	labels, err := createLabels(f)
 	if err != nil {
 		return nil, err
 	}
 
-	versionAndKind, err := getVersionAndKind(f)
+	versionAndKind, err := getVersionAndKind(f, typeToCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -1026,7 +996,7 @@ func FuzzMutateTest(f *testing.F) {
 			return
 		}
 
-		resource, err := createUnstructuredObject(ff)
+		resource, err := createUnstructuredObject(ff, "")
 		if err != nil {
 			return
 		}
@@ -1295,7 +1265,7 @@ func (fr FuzzResource) DeleteCollection(ctx context.Context, options metav1.Dele
 	return fmt.Errorf("Not implemented")
 }
 func (fr FuzzResource) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	resource, err := createUnstructuredObject(fr.ff)
+	resource, err := createUnstructuredObject(fr.ff, "")
 	if err != nil {
 		return nil, err
 	}
@@ -1343,7 +1313,7 @@ func (fr FuzzNamespaceableResource) DeleteCollection(ctx context.Context, option
 	return fmt.Errorf("Not implemented")
 }
 func (fr FuzzNamespaceableResource) Get(ctx context.Context, name string, options metav1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
-	resource, err := createUnstructuredObject(fr.ff)
+	resource, err := createUnstructuredObject(fr.ff, "")
 	if err != nil {
 		return nil, err
 	}
@@ -1358,7 +1328,7 @@ func (fr FuzzNamespaceableResource) List(ctx context.Context, opts metav1.ListOp
 		return nil, err
 	}
 	for i := 0; i < noOfObjs%10; i++ {
-		obj, err := createUnstructuredObject(fr.ff)
+		obj, err := createUnstructuredObject(fr.ff, "")
 		if err != nil {
 			return nil, err
 		}
