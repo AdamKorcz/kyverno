@@ -466,7 +466,6 @@ func FuzzEngineValidateTest(f *testing.F) {
 			validateContext,
 			pc.WithPolicy(policy),
 		)
-		panic("Here")
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
 		if blocked == false {
@@ -672,12 +671,10 @@ func ShouldBlockContainerName(pod *corev1.Pod) (bool, error) {
 
 	for _, container := range containers {
 		if container.Name != "nginx" {
-			return false, nil
-		} else {
 			return true, nil
 		}
 	}
-	return true, nil
+	return false, nil
 }
 
 func ShouldBlockImageTag(pod *corev1.Pod) (bool, error) {
@@ -687,10 +684,12 @@ func ShouldBlockImageTag(pod *corev1.Pod) (bool, error) {
 	containers := pod.Spec.Containers
 
 	for _, container := range containers {
+		split := strings.Split(container.Image, ":")
+		if len(split) != 2 {
+			return true, nil
+		}
 		if _, ok := strings.CutSuffix(container.Image, "latest"); ok {
-			if container.ImagePullPolicy == "Always" {
-				return false, nil
-			} else {
+			if container.ImagePullPolicy != "Always" {
 				return true, nil
 			}
 		}
@@ -772,18 +771,18 @@ func ShouldBlockSecurityPolicy(pod *corev1.Pod) (bool, error) {
 		return true, nil
 	}
 
-	if *securityContext.RunAsNonRoot != true {
+	if *securityContext.RunAsNonRoot == false {
 		return true, nil
-	} else {
-		return false, nil
 	}
-
-	return true, nil
+	
+	return false, nil
 }
 
 func getPod(ff *fuzz.ConsumeFuzzer) (*corev1.Pod, error) {
 	pod := &corev1.Pod{}
 	err := ff.GenerateStruct(pod)
+	pod.Kind = "Pod"
+	pod.APIVersion = "v1"
 	return pod, err
 }
 
@@ -857,7 +856,7 @@ func FuzzContainerNameTest(f *testing.F) {
 			return
 		}
 
-		fmt.Printf("Created pod: \n%+v\n", pod)
+		//fmt.Printf("Created pod: \n%+v\n", pod)
 
 		/*resourceUnstructured, err := createUnstructuredObject(ff, checker.resourceType)
 		if err != nil {
@@ -900,20 +899,22 @@ func FuzzContainerNameTest(f *testing.F) {
 		)
 		failurePolicy := kyverno.Fail
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked == shouldBlock {
-			panic(fmt.Sprintf("\nDid not block a resource that should be blocked:\n%s\n should have been blocked by \n%+v", string(resource), checker.clusterPolicy))
+		if blocked != shouldBlock {
+			fmt.Println("er:::::::::::::: ", er)
+			panic(fmt.Sprintf("\nDid not block a resource that should be blocked:\n%s\n should have been blocked by \n%+v\n\nshouldBlock was %t\nblocked was %t\n", string(resource), checker.clusterPolicy, shouldBlock, blocked))
 		}
 	})
 }
 
 func blockRequest(engineResponses []engineapi.EngineResponse, failurePolicy kyverno.FailurePolicyType) bool {
 	for _, er := range engineResponses {
-		if er.IsFailed() && er.GetValidationFailureAction().Enforce() {
+		fmt.Println("Response::::::::::::::: ", er)
+		if er.IsFailed() /*&& er.GetValidationFailureAction().Enforce()*/ {
 			return true
 		}
-		if er.IsError() && failurePolicy == kyverno.Fail {
+		/*if er.IsError() && failurePolicy == kyverno.Fail {
 			return true
-		}
+		}*/
 	}
 	return false
 }
