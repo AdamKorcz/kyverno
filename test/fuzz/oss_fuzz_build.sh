@@ -18,6 +18,7 @@ compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v1 FuzzV1MatchRe
 compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v1 FuzzV1ClusterPolicy FuzzV2beta1ClusterPolicy
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzVerifyImageAndPatchTest FuzzVerifyImageAndPatchTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzEngineValidateTest FuzzEngineValidateTest
+compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzContainerNameTest FuzzContainerNameTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzMutateTest FuzzMutateTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/validation/policy FuzzValidatePolicy FuzzValidatePolicy
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine/anchor FuzzAnchorParseTest FuzzAnchorParseTest
