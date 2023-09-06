@@ -634,34 +634,79 @@ var (
 		  ]
 		}
 	  }`)
-)
 
-// Accepts the containers spec
-/*func ShouldBlockContainerName(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No containers found")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-
-	if _, ok := spec["containers"]; !ok {
-		return false, fmt.Errorf("No containers found")
-	}
-
-	if _, ok := spec["containers"].([]map[string]interface{}); !ok {
-		panic("Incorrect")
-	}
-	containers := spec["containers"].([]map[string]interface{})
-	for _, container := range containers {
-		if name, ok := container["name"]; ok {
-			if name != "nginx" {
-				return true, nil
+	  podExistencePolicy = []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		  "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		  "rules": [
+			{
+			  "name": "pod image rule",
+			  "match": {
+				"resources": {
+				  "kinds": [
+					"Pod"
+				  ]
+				}
+			  },
+			  "validate": {
+				"pattern": {
+				  "spec": {
+					"^(containers)": [
+					  {
+						"name": "nginx"
+					  }
+					]
+				  }
+				}
+			  }
 			}
-		} else {
-			return true, nil
+		  ]
 		}
-	}
-	return false, nil
-}*/
+	  }
+		 `)
+
+	  hostPathCannotExistPolicy = []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		  "name": "validate-host-path"
+		},
+		"spec": {
+		  "rules": [
+			{
+			  "name": "validate-host-path",
+			  "match": {
+				"resources": {
+				  "kinds": [
+					"Pod"
+				  ]
+				}
+			  },
+			  "validate": {
+				"message": "Host path is not allowed",
+				"pattern": {
+				  "spec": {
+					"volumes": [
+					  {
+						"name": "*",
+						"X(hostPath)": null
+					  }
+					]
+				  }
+				}
+			  }
+			}
+		  ]
+		}
+	  }
+	 `)
+)
 
 func ShouldBlockContainerName(pod *corev1.Pod) (bool, error) {
 	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
@@ -675,6 +720,20 @@ func ShouldBlockContainerName(pod *corev1.Pod) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func ShouldBlockContainerNameExistenceAnchor(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
+		return false, fmt.Errorf("No containers found")
+	}
+	containers := pod.Spec.Containers
+
+	for _, container := range containers {
+		if container.Name == "nginx" {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func ShouldBlockImageTag(pod *corev1.Pod) (bool, error) {
@@ -696,52 +755,6 @@ func ShouldBlockImageTag(pod *corev1.Pod) (bool, error) {
 	}
 	return false, nil
 }
-// Accepts the objSpec
-/*func ShouldBlockImageTag(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["spec"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	spec := objSpec["spec"].(map[string]interface{})
-	if _, ok := spec["containers"]; !ok {
-		return false, fmt.Errorf("No spec")
-	}
-	containers := spec["containers"].([]map[string]interface{})
-
-	for _, container := range containers {
-		if _, ok := container["image"]; ok {
-			if _, ok2 := strings.CutSuffix(container["image"].(string), "latest"); ok2 {
-				if imagePullPolicy, ok3 := container["imagePullPolicy"]; ok3 {
-					if imagePullPolicy.(string) != "Always" {
-						return true, nil
-					}
-				} else {
-					return true, nil
-				}
-			} else {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
-}*/
-
-// Accepts the objSpec
-/*func ShouldBlockEquality(objSpec map[string]interface{}) (bool, error) {
-	if _, ok := objSpec["volumes"]; !ok {
-		return false, fmt.Errorf("No volumes")
-	}
-	volumes := objSpec["volumes"].([]map[string]interface{})
-	for _, volume := range volumes {
-		if hostpath, ok := volume["hostpath"]; ok {
-			if hostpath.(string) == "/var/lib" {
-				return true, nil
-			}
-		} else {
-			return true, nil
-		}
-	}
-	return false, nil
-}*/
 
 func ShouldBlockEquality(pod *corev1.Pod) (bool, error) {
 	if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 {
@@ -754,6 +767,20 @@ func ShouldBlockEquality(pod *corev1.Pod) (bool, error) {
 			if volume.VolumeSource.HostPath.Path == "/var/lib" {
 				return true, nil
 			}
+		}
+	}
+	return false, nil
+}
+
+func ShouldBlockIfHostPathExists(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Volumes == nil || len(pod.Spec.Volumes) == 0 {
+		return false, fmt.Errorf("No volumes found")
+	}
+	volumes := pod.Spec.Volumes
+
+	for _, volume := range volumes {
+		if volume.VolumeSource.HostPath != nil {
+			return true, nil
 		}
 	}
 	return false, nil
@@ -791,6 +818,8 @@ var (
 	cp2 *kyverno.ClusterPolicy
 	cp3 *kyverno.ClusterPolicy
 	cp4 *kyverno.ClusterPolicy
+	cp5 *kyverno.ClusterPolicy
+	cp6 *kyverno.ClusterPolicy
 )
 
 func init() {
@@ -814,6 +843,16 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	cp5 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(podExistencePolicy, cp5)
+	if err != nil {
+		panic(err)
+	}
+	cp6 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(hostPathCannotExistPolicy, cp6)
+	if err != nil {
+		panic(err)
+	}
 }
 
 type BypassChecker struct {
@@ -833,7 +872,7 @@ func FuzzContainerNameTest(f *testing.F) {
 
 		var checker *BypassChecker
 		checker = &BypassChecker{}
-		switch policyToCheck%4 {
+		switch policyToCheck%6 {
 		case 0:
 			checker.shouldBlock = ShouldBlockContainerName
 			checker.resourceType = "Pod"
@@ -850,7 +889,16 @@ func FuzzContainerNameTest(f *testing.F) {
 			checker.shouldBlock = ShouldBlockEquality
 			checker.resourceType = "Pod"
 			checker.clusterPolicy = cp4
+		case 4:
+			checker.shouldBlock = ShouldBlockContainerNameExistenceAnchor
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp5
+		case 5:
+			checker.shouldBlock = ShouldBlockIfHostPathExists
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp6
 		}
+
 		pod, err := getPod(ff)
 		if err != nil {
 			return
@@ -908,7 +956,7 @@ func FuzzContainerNameTest(f *testing.F) {
 
 func blockRequest(engineResponses []engineapi.EngineResponse, failurePolicy kyverno.FailurePolicyType) bool {
 	for _, er := range engineResponses {
-		fmt.Println("Response::::::::::::::: ", er)
+		//fmt.Println("Response::::::::::::::: ", er)
 		if er.IsFailed() /*&& er.GetValidationFailureAction().Enforce()*/ {
 			return true
 		}
