@@ -855,7 +855,7 @@ func ShouldBlockIfSupplementalGroupsExistAndIsNotBetween(pod *corev1.Pod) (bool,
 	if pod.Spec.SecurityContext != nil {
 		if len(pod.Spec.SecurityContext.SupplementalGroups) != 0 {
 			for _, sg := range pod.Spec.SecurityContext.SupplementalGroups {
-				if sg <= 0 || sg < 100001 {
+				if sg <= 0 || sg >= 100001 {
 					return true, nil
 				}
 			}
@@ -878,12 +878,14 @@ func ShouldBlockIfSupplementalGroupsExistAndAreLessThanZero(pod *corev1.Pod) (bo
 }
 
 func ShouldBlockIfHostnetworkOrPortAreSpecified(pod *corev1.Pod) (bool, error) {
-	fieldName := "HostNetwork"
-	value := reflect.ValueOf(pod.Spec)
-	field := value.FieldByName(fieldName)
-	if field.IsValid() {
-		// field is specified!
-		return true, nil
+	if pod.Spec.SecurityContext != nil {
+		fieldName := "HostNetwork"
+		value := reflect.ValueOf(pod.Spec.SecurityContext)
+		field := value.Elem().FieldByName(fieldName)
+		if field.IsValid() {
+			// field is specified but cannot be according to the policy
+			return true, nil
+		}
 	}
 
 	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
@@ -898,7 +900,7 @@ func ShouldBlockIfHostnetworkOrPortAreSpecified(pod *corev1.Pod) (bool, error) {
   			field := value.FieldByName(fieldName)
 
   			if field.IsValid() {
-  				// field is specified!
+  				// field is specified but cannot be according to the policy
   				return true, nil
   			}
 		}
@@ -907,15 +909,7 @@ func ShouldBlockIfHostnetworkOrPortAreSpecified(pod *corev1.Pod) (bool, error) {
 }
 
 func ShouldBlockIfNamespaceIsEmptyOrDefault(pod *corev1.Pod) (bool, error) {
-	fieldName := "ObjectMeta"
-	value := reflect.ValueOf(pod)
-	field := value.FieldByName(fieldName)
-	if !field.IsValid() {
-		// field is not specified!
-		return false, fmt.Errorf("No Metadata found")
-	}
-
-	if len(pod.ObjectMeta.Namespace) < 1 {
+	if len(pod.ObjectMeta.Namespace) == 0 {
 		return true, nil
 	}
 
@@ -1103,7 +1097,7 @@ type BypassChecker struct {
 	clusterPolicy *kyverno.ClusterPolicy
 }
 
-func FuzzContainerNameTest(f *testing.F) {
+func FuzzPodBypass(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 
 		ff := fuzz.NewConsumer(data)
