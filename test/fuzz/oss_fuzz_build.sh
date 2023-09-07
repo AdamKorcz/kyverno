@@ -3,6 +3,7 @@
 # This script is only meant to be run by OSS-Fuzz.
 # OSS-Fuzz uses this script to compile kyvernos fuzzers
 
+go mod edit -replace github.com/AdaLogics/go-fuzz-headers=github.com/AdamKorcz/go-fuzz-headers-1@9f598545f62c14ac4d4d5d1f1a99057342100d09
 # Needed by OSS-Fuzz:
 printf "package engine\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > $SRC/kyverno/pkg/engine/registerfuzzdep.go
 go mod tidy

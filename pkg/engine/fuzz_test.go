@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -706,7 +707,224 @@ var (
 		}
 	  }
 	 `)
+	namespaceCannotBeEmptyOrDefaultPolicy = []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "validate-namespace"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "check-default-namespace",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "A namespace is required",
+					"anyPattern": [
+					   {
+						  "metadata": {
+							 "namespace": "?*"
+						  }
+					   },
+					   {
+						  "metadata": {
+							 "namespace": "!default"
+						  }
+					   }
+					]
+				 }
+			  }
+		   ]
+		}
+	 }
+	`)
+
+	hostnetworkAndPortNotAllowedPolicy = []byte(`
+	{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "validate-host-network-port"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "validate-host-network-port",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "Host network and port are not allowed",
+					"pattern": {
+					   "spec": {
+						  "hostNetwork": false,
+						  "containers": [
+							 {
+								"name": "*",
+								"ports": [
+								   {
+									  "hostPort": null
+								   }
+								]
+							 }
+						  ]
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }
+	 `)
+
+	supplementalGroupsShouldBeHigherThanZeroPolicy = []byte(`{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "pod rule 2",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "pod: validate run as non root user",
+					"pattern": {
+					   "spec": {
+						  "=(supplementalGroups)": ">0"
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }	 `)
+
+	supplementalGroupsShouldBeBetween = []byte(`{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		   "rules": [
+			  {
+				 "name": "pod rule 2",
+				 "match": {
+					"resources": {
+					   "kinds": [
+						  "Pod"
+					   ]
+					}
+				 },
+				 "validate": {
+					"message": "pod: validate run as non root user",
+					"pattern": {
+					   "spec": {
+						"=(supplementalGroups)": [
+							">0 & <100001"
+						  ]
+					   }
+					}
+				 }
+			  }
+		   ]
+		}
+	 }	 `)
 )
+
+func ShouldBlockIfSupplementalGroupsExistAndIsNotBetween(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.SecurityContext != nil {
+		if len(pod.Spec.SecurityContext.SupplementalGroups) != 0 {
+			for _, sg := range pod.Spec.SecurityContext.SupplementalGroups {
+				if sg <= 0 || sg < 100001 {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+func ShouldBlockIfSupplementalGroupsExistAndAreLessThanZero(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.SecurityContext != nil {
+		if len(pod.Spec.SecurityContext.SupplementalGroups) != 0 {
+			for _, sg := range pod.Spec.SecurityContext.SupplementalGroups {
+				if sg <= 0 {
+					return true, nil
+				}
+			}
+		}
+	}
+	return false, nil
+}
+
+func ShouldBlockIfHostnetworkOrPortAreSpecified(pod *corev1.Pod) (bool, error) {
+	fieldName := "HostNetwork"
+	value := reflect.ValueOf(pod.Spec)
+	field := value.FieldByName(fieldName)
+	if field.IsValid() {
+		// field is specified!
+		return true, nil
+	}
+
+	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
+		return false, fmt.Errorf("No containers found")
+	}
+	containers := pod.Spec.Containers
+
+	for _, container := range containers {
+		for _, port := range container.Ports {
+			fieldName := "HostPort"
+  			value := reflect.ValueOf(port)
+  			field := value.FieldByName(fieldName)
+
+  			if field.IsValid() {
+  				// field is specified!
+  				return true, nil
+  			}
+		}
+	}
+	return false, nil
+}
+
+func ShouldBlockIfNamespaceIsEmptyOrDefault(pod *corev1.Pod) (bool, error) {
+	fieldName := "ObjectMeta"
+	value := reflect.ValueOf(pod)
+	field := value.FieldByName(fieldName)
+	if !field.IsValid() {
+		// field is not specified!
+		return false, fmt.Errorf("No Metadata found")
+	}
+
+	if len(pod.ObjectMeta.Namespace) < 1 {
+		return true, nil
+	}
+
+	if pod.ObjectMeta.Namespace == "default" {
+		return true, nil
+	}
+	return false, nil
+}
+
 
 func ShouldBlockContainerName(pod *corev1.Pod) (bool, error) {
 	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
@@ -820,6 +1038,10 @@ var (
 	cp4 *kyverno.ClusterPolicy
 	cp5 *kyverno.ClusterPolicy
 	cp6 *kyverno.ClusterPolicy
+	cp7 *kyverno.ClusterPolicy
+	cp8 *kyverno.ClusterPolicy
+	cp9 *kyverno.ClusterPolicy
+	cp10 *kyverno.ClusterPolicy
 )
 
 func init() {
@@ -853,6 +1075,26 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	cp7 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(namespaceCannotBeEmptyOrDefaultPolicy, cp7)
+	if err != nil {
+		panic(err)
+	}
+	cp8 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(hostnetworkAndPortNotAllowedPolicy, cp8)
+	if err != nil {
+		panic(err)
+	}
+	cp9 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(supplementalGroupsShouldBeHigherThanZeroPolicy, cp9)
+	if err != nil {
+		panic(err)
+	}
+	cp10 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(supplementalGroupsShouldBeBetween, cp10)
+	if err != nil {
+		panic(err)
+	}
 }
 
 type BypassChecker struct {
@@ -872,7 +1114,7 @@ func FuzzContainerNameTest(f *testing.F) {
 
 		var checker *BypassChecker
 		checker = &BypassChecker{}
-		switch policyToCheck%6 {
+		switch policyToCheck%10 {
 		case 0:
 			checker.shouldBlock = ShouldBlockContainerName
 			checker.resourceType = "Pod"
@@ -897,6 +1139,22 @@ func FuzzContainerNameTest(f *testing.F) {
 			checker.shouldBlock = ShouldBlockIfHostPathExists
 			checker.resourceType = "Pod"
 			checker.clusterPolicy = cp6
+		case 6:
+			checker.shouldBlock = ShouldBlockIfNamespaceIsEmptyOrDefault
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp7
+		case 7:
+			checker.shouldBlock = ShouldBlockIfHostnetworkOrPortAreSpecified
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp8
+		case 8:
+			checker.shouldBlock = ShouldBlockIfSupplementalGroupsExistAndAreLessThanZero
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp9
+		case 9:
+			checker.shouldBlock = ShouldBlockIfSupplementalGroupsExistAndIsNotBetween
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp10
 		}
 
 		pod, err := getPod(ff)
