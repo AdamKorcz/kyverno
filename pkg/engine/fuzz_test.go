@@ -37,6 +37,7 @@ import (
 	"github.com/kyverno/kyverno/pkg/engine/policycontext"
 	"github.com/kyverno/kyverno/pkg/imageverifycache"
 	"github.com/kyverno/kyverno/pkg/registryclient"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubeutils "github.com/kyverno/kyverno/pkg/utils/kube"
 	engineapi "github.com/kyverno/kyverno/pkg/engine/api"
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -849,7 +850,137 @@ var (
 		   ]
 		}
 	 }	 `)
+
+	shouldHaveMoreMemoryThanFirstContainer = []byte(`{
+		"apiVersion": "kyverno.io/v1",
+		"kind": "ClusterPolicy",
+		"metadata": {
+		   "name": "policy-secaas-k8s"
+		},
+		"spec": {
+		   "rules": [
+				{
+					"name": "validate-host-network-port",
+					"match": {
+						"resources": {
+					   		"kinds": [
+						  		"Pod"
+					   		]
+						}
+				 	},
+				 	"validate": {
+						"message": "Host network and port are not allowed",
+						"pattern": {
+					   		"spec":{
+								"containers":[
+									{
+										"name":"*",
+										"resources":{
+											"requests":{
+												"memory":"$(<=/spec/containers/0/resources/limits/memory)"
+											},
+											"limits":{
+												"memory":"2048Mi"
+											}
+										}
+									}
+								]
+							}
+						}
+				 	}
+			  	}
+		   	]
+		}
+	}	 `)
 )
+
+
+func ShouldBlockIfLessMemoryThanFirstContainer(pod *corev1.Pod) (bool, error) {
+	if pod.Spec.Containers == nil || len(pod.Spec.Containers) == 0 {
+		return false, fmt.Errorf("No containers found")
+	}
+	containers := pod.Spec.Containers
+
+	if len(containers) < 2 {
+		return false, nil
+	}
+
+	var container0MemLimit resource.Quantity
+	container0 := containers[0]
+
+	fieldName := "Resources"
+	value := reflect.ValueOf(container0)
+	field := value.FieldByName(fieldName)
+
+	if !field.IsValid() {
+		// field is not specied, so fail
+		return true, nil
+	}
+
+	fieldName = "Limits"
+	value = reflect.ValueOf(container0.Resources)
+	field = value.FieldByName(fieldName)
+
+	if !field.IsValid() {
+		// field is not specied, so fail
+		return true, nil
+	}
+
+	if limit, ok := container0.Resources.Limits[corev1.ResourceMemory]; ok {
+		container0MemLimit = limit
+	}
+
+
+	for i, container := range containers {
+		if i > 0 {
+			fieldName := "Resources"
+  			value := reflect.ValueOf(container)
+  			field := value.FieldByName(fieldName)
+
+  			if !field.IsValid() {
+  				// field is not specied, so fail
+  				return true, nil
+  			}
+
+			fieldName = "Limits"
+  			value = reflect.ValueOf(container.Resources)
+  			field = value.FieldByName(fieldName)
+
+  			if !field.IsValid() {
+  				// field is not specied, so fail
+  				return true, nil
+  			}
+
+  			if limit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
+  				if !limit.Equal(mi2048) {
+  					return true, nil
+  				}
+  			} else {
+  				return true, nil
+  			}
+
+			fieldName = "Requests"
+  			value = reflect.ValueOf(container.Resources)
+  			field = value.FieldByName(fieldName)
+
+  			if !field.IsValid() {
+  				// field is not specied, so fail
+  				return true, nil
+  			}
+
+  			if limit, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+
+  				smallerThanOrEqual := limit.Cmp(container0MemLimit)
+  				if smallerThanOrEqual == -1 || smallerThanOrEqual == 0 {
+  					return true, nil
+  				}
+  			} else {
+  				return false, nil
+  			}
+		}
+	}
+	return false, nil
+}
 
 func ShouldBlockIfSupplementalGroupsExistAndIsNotBetween(pod *corev1.Pod) (bool, error) {
 	if pod.Spec.SecurityContext != nil {
@@ -1036,9 +1167,13 @@ var (
 	cp8 *kyverno.ClusterPolicy
 	cp9 *kyverno.ClusterPolicy
 	cp10 *kyverno.ClusterPolicy
+	cp11 *kyverno.ClusterPolicy
+
+	mi2048 resource.Quantity
 )
 
 func init() {
+	mi2048, _ = resource.ParseQuantity("2048Mi")
 	cp1 = &kyverno.ClusterPolicy{}
 	err := json.Unmarshal(containerNamePolicy, cp1)
 	if err != nil {
@@ -1089,6 +1224,11 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+	cp11 = &kyverno.ClusterPolicy{}
+	err = json.Unmarshal(shouldHaveMoreMemoryThanFirstContainer, cp11)
+	if err != nil {
+		panic(err)
+	}
 }
 
 type BypassChecker struct {
@@ -1108,7 +1248,7 @@ func FuzzPodBypass(f *testing.F) {
 
 		var checker *BypassChecker
 		checker = &BypassChecker{}
-		switch policyToCheck%10 {
+		switch policyToCheck%11 {
 		case 0:
 			checker.shouldBlock = ShouldBlockContainerName
 			checker.resourceType = "Pod"
@@ -1149,6 +1289,10 @@ func FuzzPodBypass(f *testing.F) {
 			checker.shouldBlock = ShouldBlockIfSupplementalGroupsExistAndIsNotBetween
 			checker.resourceType = "Pod"
 			checker.clusterPolicy = cp10
+		case 10:
+			checker.shouldBlock = ShouldBlockIfLessMemoryThanFirstContainer
+			checker.resourceType = "Pod"
+			checker.clusterPolicy = cp11
 		}
 
 		pod, err := getPod(ff)
