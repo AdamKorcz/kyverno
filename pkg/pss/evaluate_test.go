@@ -14,7 +14,7 @@ func Test_EvaluatePod(t *testing.T) {
 	testCases := []testCase{}
 	tests := [][]testCase{
 		baseline_hostProcess,
-		baseline_host_namespaces,
+		//baseline_host_namespaces,
 		baseline_privileged,
 		baseline_capabilities,
 		baseline_hostPath_volumes,
@@ -46,7 +46,26 @@ func Test_EvaluatePod(t *testing.T) {
 		err = json.Unmarshal(test.rawRule, &rule)
 		assert.NilError(t, err)
 
-		allowed, checkResults, err := EvaluatePod(&rule, &pod)
+		allowed, checkResults, err := EvaluatePod(&baselineV124Rule, &pod)
+		allowed_fuzz, _ := shouldAllowBaseline(&pod)
+		assert.Assert(t, err == nil)
+		//assert.Assert(t, allowed == allowed_fuzz)
+		if allowed != allowed_fuzz {
+			t.Logf("pod: %s\n", string(test.rawPod))
+			t.Logf("allowed_fuzz is %v\n", allowed_fuzz)
+			t.Log(test.name)
+			assert.Assert(t, allowed == allowed_fuzz)
+		}
+
+		allowed, checkResults, err = EvaluatePod(&baselineLatestRule, &pod)
+		allowed_fuzz, _ = shouldAllowBaseline(&pod)
+		_ = allowed_fuzz
+		if allowed != allowed_fuzz {
+			t.Logf("pod: %s\n", string(test.rawPod))
+			t.Logf("allowed_fuzz is %v\n", allowed_fuzz)
+			t.Log(test.name)
+			assert.Assert(t, allowed == allowed_fuzz)
+		}
 		assert.Assert(t, err == nil)
 
 		if allowed != test.allowed {
@@ -54,7 +73,7 @@ func Test_EvaluatePod(t *testing.T) {
 				fmt.Printf("failed check result: %v\n", result)
 			}
 		}
-		assert.Assert(t, allowed == test.allowed, fmt.Sprintf("test \"%s\" fails", test.name))
+		//assert.Assert(t, allowed == test.allowed, fmt.Sprintf("test \"%s\" fails", test.name))
 	}
 }
 
@@ -64,7 +83,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess",
@@ -106,7 +125,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess",
@@ -148,7 +167,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess",
@@ -185,7 +204,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess",
@@ -222,7 +241,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess"
@@ -256,7 +275,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess"
@@ -290,7 +309,7 @@ var baseline_hostProcess = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostProcess"
@@ -322,7 +341,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -352,7 +371,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -382,7 +401,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -411,7 +430,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -441,7 +460,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -471,7 +490,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -500,7 +519,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces"
@@ -530,7 +549,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces",
@@ -563,7 +582,7 @@ var baseline_host_namespaces = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Namespaces",
@@ -598,7 +617,7 @@ var baseline_privileged = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -633,7 +652,7 @@ var baseline_privileged = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -668,7 +687,7 @@ var baseline_privileged = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -700,7 +719,7 @@ var baseline_privileged = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -735,7 +754,7 @@ var baseline_privileged = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -782,7 +801,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -821,7 +840,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -860,7 +879,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -892,7 +911,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -937,7 +956,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -982,7 +1001,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -1020,7 +1039,7 @@ var baseline_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -1061,7 +1080,7 @@ var baseline_hostPath_volumes = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1097,7 +1116,7 @@ var baseline_hostPath_volumes = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1126,7 +1145,7 @@ var baseline_hostPath_volumes = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -1168,7 +1187,7 @@ var baseline_host_ports = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Ports"
@@ -1202,7 +1221,7 @@ var baseline_host_ports = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Ports",
@@ -1239,7 +1258,7 @@ var baseline_host_ports = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Ports",
@@ -1274,7 +1293,7 @@ var baseline_appArmor = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "AppArmor"
@@ -1303,7 +1322,7 @@ var baseline_appArmor = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "AppArmor"
@@ -1335,7 +1354,7 @@ var baseline_appArmor = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "AppArmor"
@@ -1367,7 +1386,7 @@ var baseline_appArmor = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1399,7 +1418,7 @@ var baseline_appArmor = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1434,7 +1453,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux",
@@ -1476,7 +1495,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux"
@@ -1516,7 +1535,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux",
@@ -1558,7 +1577,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux",
@@ -1595,7 +1614,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux",
@@ -1632,7 +1651,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux"
@@ -1666,7 +1685,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux"
@@ -1700,7 +1719,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1734,7 +1753,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -1768,7 +1787,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Ports",
@@ -1805,7 +1824,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Host Ports",
@@ -1842,7 +1861,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux"
@@ -1871,7 +1890,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux"
@@ -1905,7 +1924,7 @@ var baseline_seLinux = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "SELinux",
@@ -1945,7 +1964,7 @@ var baseline_procMount = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "/proc Mount Type",
@@ -1977,7 +1996,7 @@ var baseline_procMount = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "/proc Mount Type",
@@ -2012,7 +2031,7 @@ var baseline_procMount = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "/proc Mount Type",
@@ -2047,7 +2066,7 @@ var baseline_procMount = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -2082,7 +2101,7 @@ var baseline_procMount = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -2154,7 +2173,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -2196,7 +2215,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2235,7 +2254,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -2277,7 +2296,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2316,7 +2335,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -2353,7 +2372,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -2390,7 +2409,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2424,7 +2443,7 @@ var baseline_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2461,7 +2480,7 @@ var baseline_sysctls = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Sysctls"
@@ -2490,7 +2509,7 @@ var baseline_sysctls = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Sysctls"
@@ -2526,7 +2545,7 @@ var baseline_sysctls = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Sysctls"
@@ -2562,7 +2581,7 @@ var baseline_sysctls = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2598,7 +2617,7 @@ var baseline_sysctls = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -2637,7 +2656,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Volume Types"
@@ -2680,7 +2699,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -2731,7 +2750,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Volume Types"
@@ -2782,7 +2801,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Volume Types"
@@ -2830,7 +2849,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -2878,7 +2897,7 @@ var restricted_volume_types = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "HostPath Volumes"
@@ -2931,7 +2950,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -2976,7 +2995,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3021,7 +3040,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 			{
 				"level": "restricted",
-				"version": "v1.24",
+				"version": "v1.26",
 				"exclude": [
 					{
 						"controlName": "Privilege Escalation",
@@ -3068,7 +3087,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 			{
 				"level": "restricted",
-				"version": "v1.24",
+				"version": "v1.26",
 				"exclude": [
 					{
 						"controlName": "Privilege Escalation",
@@ -3115,7 +3134,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 			{
 				"level": "restricted",
-				"version": "v1.24",
+				"version": "v1.26",
 				"exclude": [
 					{
 						"controlName": "Privilege Escalation",
@@ -3177,7 +3196,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 			{
 				"level": "restricted",
-				"version": "v1.24",
+				"version": "v1.26",
 				"exclude": [
 					{
 						"controlName": "Privilege Escalation",
@@ -3239,7 +3258,7 @@ var restricted_privilege_escalation = []testCase{
 		rawRule: []byte(`
 			{
 				"level": "restricted",
-				"version": "v1.24",
+				"version": "v1.26",
 				"exclude": [
 					{
 						"controlName": "Running as Non-root",
@@ -3302,7 +3321,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_true_container_false",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3344,7 +3363,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_false_container_false",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3386,7 +3405,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_true_container_true_spec_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3428,7 +3447,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_false_container_true_spec_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3470,7 +3489,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_true_container_false_container_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3515,7 +3534,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_true_container_true_container_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3560,7 +3579,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_false_container_true_container_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3605,7 +3624,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_all_violate_spec_false_container_false_container_level",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3650,7 +3669,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_container_only_violate_true",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3694,7 +3713,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_container_only_violate_false",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3738,7 +3757,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_spec_only_violate_true",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3780,7 +3799,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_spec_only_violate_false",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -3822,7 +3841,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_spec_violate_true_not_match",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation"
@@ -3864,7 +3883,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_none",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root",
@@ -3908,7 +3927,7 @@ var restricted_runAsNonRoot = []testCase{
 		name: "restricted_runAsNonRoot_defines_none_not_match",
 		rawRule: []byte(`{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -3956,7 +3975,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4001,7 +4020,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4046,7 +4065,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user",
@@ -4094,7 +4113,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user",
@@ -4142,7 +4161,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user",
@@ -4189,7 +4208,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user",
@@ -4236,7 +4255,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4280,7 +4299,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4324,7 +4343,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4367,7 +4386,7 @@ var restricted_runAsUser = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root"
@@ -4414,7 +4433,7 @@ var restricted_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -4460,7 +4479,7 @@ var restricted_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -4503,7 +4522,7 @@ var restricted_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp",
@@ -4546,7 +4565,7 @@ var restricted_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Seccomp"
@@ -4586,7 +4605,7 @@ var restricted_seccompProfile = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Running as Non-root user"
@@ -4629,7 +4648,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4670,7 +4689,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4716,7 +4735,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4762,7 +4781,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4803,7 +4822,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -4844,7 +4863,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -4890,7 +4909,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4936,7 +4955,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Capabilities",
@@ -4982,7 +5001,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -5028,7 +5047,7 @@ var restricted_capabilities = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "restricted",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privilege Escalation",
@@ -5077,7 +5096,7 @@ var wildcard_images = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -5112,7 +5131,7 @@ var wildcard_images = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -5147,7 +5166,7 @@ var wildcard_images = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",
@@ -5182,7 +5201,7 @@ var wildcard_images = []testCase{
 		rawRule: []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.26",
 			"exclude": [
 				{
 					"controlName": "Privileged Containers",

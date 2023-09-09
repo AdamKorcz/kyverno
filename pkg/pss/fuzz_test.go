@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
@@ -39,10 +40,10 @@ var (
 		"net.ipv4.tcp_syncookies",
 		"net.ipv4.ping_group_range",
 	}
-	baselineV124Policy = []byte(`
+	baselineV126Policy = []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24"
+			"version": "v1.26"
 		}`)
 	baselineLatestPolicy = []byte(`
 		{
@@ -52,7 +53,9 @@ var (
 )
 
 func shouldBlockSELinuxUser(opts *corev1.SELinuxOptions) bool {
-
+	if opts == nil {
+		return false
+	}
 	// Check SELinux User. Must be nil/undefined or ""
 	fieldName := "User"
 	value := reflect.ValueOf(opts)
@@ -68,6 +71,9 @@ func shouldBlockSELinuxUser(opts *corev1.SELinuxOptions) bool {
 }
 
 func shouldBlockSELinuxRole(opts *corev1.SELinuxOptions) bool {
+	if opts == nil {
+		return false
+	}
 
 	// Check SELinux Role. Must be nil/undefined or ""
 	fieldName := "Role"
@@ -90,6 +96,29 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 	}*/
 	spec := pod.Spec
 
+	// Check volumes hostpath
+	if len(spec.Volumes) > 0 {
+		volumes := spec.Volumes
+		for _, volume := range volumes {
+			if volume.HostPath != nil {
+				return false, nil
+			}
+		}
+	}
+
+	// Check AppArmor
+	if len(pod.ObjectMeta.Annotations) > 0 {
+		annotations := pod.ObjectMeta.Annotations
+		for k, v := range annotations {
+			if strings.HasPrefix(k, "container.apparmor.security.beta.kubernetes.io/") {
+				if v != "runtime/default" && !strings.HasPrefix(v, "localhost/") {
+					fmt.Println("VVVVVVVVVVVVVVVVVVVVVVVV", v)
+					return false, nil
+				}
+			}
+		}
+	}
+
 	/////////////////////////////
 	///// Check Container-related properties /////
 	/////////////////////////////
@@ -104,11 +133,8 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 			}
 		}
 
-		if shouldBlockSELinuxUser(sc.SELinuxOptions) {
-			return false, nil
-		}
-
-		if shouldBlockSELinuxRole(sc.SELinuxOptions) {
+		// Check spec.securityContext.seLinuxOptions
+		if shouldBlockContainerSELinux(sc.SELinuxOptions) {
 			return false, nil
 		}
 
@@ -125,12 +151,12 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 		// spec.securityContext.sysctls[*].name
 		fieldName := "Sysctls"
 		value := reflect.ValueOf(sc)
-		field := value.FieldByName(fieldName)
+		field := value.Elem().FieldByName(fieldName)
 
 		if field.IsValid() {
 			for _, sysctl := range sc.Sysctls {
 				if !slices.Contains(allowed_sysctls, sysctl.Name) {
-
+					return false, nil
 				}
 			}
 		}
@@ -248,7 +274,7 @@ func shouldBlockContainerSecurityContext(sc *corev1.SecurityContext) bool {
 	}
 	// Check privileged. Must be nil or false
 	if sc.Privileged != nil {
-		if *sc.Privileged == false {
+		if *sc.Privileged == true {
 			return true
 		}
 	}
@@ -291,10 +317,13 @@ func shouldBlockContainerSecurityContext(sc *corev1.SecurityContext) bool {
 }
 
 func shouldBlockContainerSELinux(opts *corev1.SELinuxOptions) bool {
+	if opts == nil {
+		return false
+	}
 	// Check SELinux Type. Must be allowed value or nil/undefined or ""
 	fieldName := "Type"
 	value := reflect.ValueOf(opts)
-	field := value.FieldByName(fieldName)
+	field := value.Elem().FieldByName(fieldName)
 
 	if field.IsValid() {
 		seLinuxType := opts.Type
@@ -335,15 +364,13 @@ func shouldBlockContainerPorts(ports []corev1.ContainerPort) bool {
 func shouldBlockBaselineCapabilities(capabilities *corev1.Capabilities) (bool) {
 	fieldName := "Add"
 	value := reflect.ValueOf(capabilities)
-	field := value.FieldByName(fieldName)
+	field := value.Elem().FieldByName(fieldName)
 
 	if field.IsValid() {
 		if len(capabilities.Add) > 0 {
 			for _, capability := range capabilities.Add {
-				for _, allowedCapability := range allowedCapabilities {
-					if capability != allowedCapability {
-						return true
-					}
+				if !slices.Contains(allowedCapabilities, capability) {
+					return true
 				}
 			}
 		}
@@ -364,7 +391,7 @@ var (
 )
 
 func init() {
-		err := json.Unmarshal(baselineV124Policy, &baselineV124Rule)
+		err := json.Unmarshal(baselineV126Policy, &baselineV124Rule)
 		if err != nil {
 			panic(err)
 		}
