@@ -42,7 +42,7 @@ var (
 	baselineOnlyPolicy = []byte(`
 		{
 			"level": "baseline",
-			"version": "v1.24",
+			"version": "v1.24"
 		}`)
 )
 
@@ -51,7 +51,7 @@ func shouldBlockSELinuxUser(opts *corev1.SELinuxOptions) bool {
 	// Check SELinux User. Must be nil/undefined or ""
 	fieldName := "User"
 	value := reflect.ValueOf(opts)
-	field := value.FieldByName(fieldName)
+	field := value.Elem().FieldByName(fieldName)
 
 	if field.IsValid() {
 		seLinuxUser := opts.User
@@ -67,7 +67,7 @@ func shouldBlockSELinuxRole(opts *corev1.SELinuxOptions) bool {
 	// Check SELinux Role. Must be nil/undefined or ""
 	fieldName := "Role"
 	value := reflect.ValueOf(opts)
-	field := value.FieldByName(fieldName)
+	field := value.Elem().FieldByName(fieldName)
 
 	if field.IsValid() {
 		seLinuxUser := opts.Role
@@ -370,6 +370,7 @@ func FuzzBaselinePS(f *testing.F) {
 
 		var allowPod bool
 		allowPod, _ = shouldAllowBaseline(pod)
+		if allowPod { return }
 
 		var rule kyvernov1.PodSecurity
 		err = json.Unmarshal(baselineOnlyPolicy, &rule)
