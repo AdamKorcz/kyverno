@@ -5,18 +5,42 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"testing"
 
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
-	//"gotest.tools/assert"
+
 	corev1 "k8s.io/api/core/v1"
 
 	fuzz "github.com/AdamKorcz/go-fuzz-headers-1"
+	"github.com/AdamKorcz/go-118-fuzz-build/testing"
 	"golang.org/x/exp/slices"
 )
 
 var (
-	allowedCapabilities = []corev1.Capability{"AUDIT_WRITE",
+	testCases	= []testCase{}
+	tests		= [][]testCase{
+		baseline_hostProcess,
+
+		baseline_privileged,
+		baseline_capabilities,
+		baseline_hostPath_volumes,
+		baseline_host_ports,
+		baseline_appArmor,
+		baseline_seLinux,
+		baseline_procMount,
+		baseline_seccompProfile,
+		baseline_sysctls,
+		restricted_volume_types,
+		restricted_privilege_escalation,
+		restricted_runAsNonRoot,
+		restricted_runAsUser,
+		restricted_seccompProfile,
+		restricted_capabilities,
+		wildcard_images,
+	}
+
+	premadePods	[]*corev1.Pod
+
+	allowedCapabilities	= []corev1.Capability{"AUDIT_WRITE",
 		"CHOWN",
 		"DAC_OVERRIDE",
 		"FOWNER",
@@ -29,23 +53,23 @@ var (
 		"SETPCAP",
 		"SETUID",
 		"SYS_CHROOT"}
-	allowedSELinuxTypes = []string{"container_t",
+	allowedSELinuxTypes	= []string{"container_t",
 		"container_init_t",
 		"container_kvm_t",
 		""}
-	allowed_sysctls = []string{
+	allowed_sysctls	= []string{
 		"kernel.shm_rmid_forced",
 		"net.ipv4.ip_local_port_range",
 		"net.ipv4.ip_unprivileged_port_start",
 		"net.ipv4.tcp_syncookies",
 		"net.ipv4.ping_group_range",
 	}
-	baselineV126Policy = []byte(`
+	baselineV126Policy	= []byte(`
 		{
 			"level": "baseline",
 			"version": "v1.26"
 		}`)
-	baselineLatestPolicy = []byte(`
+	baselineLatestPolicy	= []byte(`
 		{
 			"level": "baseline",
 			"version": "latest"
@@ -56,7 +80,7 @@ func shouldBlockSELinuxUser(opts *corev1.SELinuxOptions) bool {
 	if opts == nil {
 		return false
 	}
-	// Check SELinux User. Must be nil/undefined or ""
+
 	fieldName := "User"
 	value := reflect.ValueOf(opts)
 	field := value.Elem().FieldByName(fieldName)
@@ -75,7 +99,6 @@ func shouldBlockSELinuxRole(opts *corev1.SELinuxOptions) bool {
 		return false
 	}
 
-	// Check SELinux Role. Must be nil/undefined or ""
 	fieldName := "Role"
 	value := reflect.ValueOf(opts)
 	field := value.Elem().FieldByName(fieldName)
@@ -89,14 +112,10 @@ func shouldBlockSELinuxRole(opts *corev1.SELinuxOptions) bool {
 	return false
 }
 
-// return true if pod should be allowed
 func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
-	/*if pod.Spec == nil {
-		return true, nil
-	}*/
+
 	spec := pod.Spec
 
-	// Check volumes hostpath
 	if len(spec.Volumes) > 0 {
 		volumes := spec.Volumes
 		for _, volume := range volumes {
@@ -106,7 +125,6 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 		}
 	}
 
-	// Check AppArmor
 	if len(pod.ObjectMeta.Annotations) > 0 {
 		annotations := pod.ObjectMeta.Annotations
 		for k, v := range annotations {
@@ -119,12 +137,9 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 		}
 	}
 
-	/////////////////////////////
-	///// Check Container-related properties /////
-	/////////////////////////////
 	if spec.SecurityContext != nil {
 		sc := spec.SecurityContext
-		// Check host process. Must be nil or false
+
 		if sc.WindowsOptions != nil {
 			if sc.WindowsOptions.HostProcess != nil {
 				if *sc.WindowsOptions.HostProcess == true {
@@ -133,13 +148,10 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 			}
 		}
 
-		// Check spec.securityContext.seLinuxOptions
 		if shouldBlockContainerSELinux(sc.SELinuxOptions) {
 			return false, nil
 		}
 
-		// spec.securityContext.seccompProfile.type
-		// Check Seccomp
 		if sc.SeccompProfile != nil {
 			seccompType := sc.SeccompProfile.Type
 			defaultSeccomp := corev1.SeccompProfileTypeRuntimeDefault
@@ -148,7 +160,7 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 				return false, nil
 			}
 		}
-		// spec.securityContext.sysctls[*].name
+
 		fieldName := "Sysctls"
 		value := reflect.ValueOf(sc)
 		field := value.Elem().FieldByName(fieldName)
@@ -166,14 +178,13 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 
 		containers := pod.Spec.Containers
 		for _, container := range containers {
-			// Check host process. Must be nil or false
+
 			if container.SecurityContext != nil {
 				if shouldBlockContainerSecurityContext(container.SecurityContext) {
 					return false, nil
 				}
 			}
 
-			// Check container ports. Must be nil or 0
 			fieldName := "Ports"
 			value := reflect.ValueOf(container)
 			field := value.FieldByName(fieldName)
@@ -189,14 +200,13 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 
 		containers := pod.Spec.InitContainers
 		for _, container := range containers {
-			// Check host process. Must be nil or false
+
 			if container.SecurityContext != nil {
 				if shouldBlockContainerSecurityContext(container.SecurityContext) {
 					return false, nil
 				}
 			}
 
-			// Check container ports. Must be nil or 0
 			fieldName := "Ports"
 			value := reflect.ValueOf(container)
 			field := value.FieldByName(fieldName)
@@ -211,14 +221,13 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 	if pod.Spec.EphemeralContainers != nil || len(pod.Spec.EphemeralContainers) != 0 {
 		containers := pod.Spec.EphemeralContainers
 		for _, container := range containers {
-			// Check host process. Must be nil or false
+
 			if container.SecurityContext != nil {
 				if shouldBlockContainerSecurityContext(container.SecurityContext) {
 					return false, nil
 				}
 			}
 
-			// Check container ports. Must be nil or 0
 			fieldName := "Ports"
 			value := reflect.ValueOf(container)
 			field := value.FieldByName(fieldName)
@@ -230,8 +239,6 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 		}
 	}
 
-	////////////////////////////////////7
-	// Host Namespaces
 	if spec.SecurityContext != nil {
 		fieldName := "HostNetwork"
 		value := reflect.ValueOf(spec)
@@ -272,14 +279,13 @@ func shouldBlockContainerSecurityContext(sc *corev1.SecurityContext) bool {
 			}
 		}
 	}
-	// Check privileged. Must be nil or false
+
 	if sc.Privileged != nil {
 		if *sc.Privileged == true {
 			return true
 		}
 	}
 
-	// Check capabilities
 	if sc.Capabilities != nil {
 		capabilities := sc.Capabilities
 
@@ -288,7 +294,6 @@ func shouldBlockContainerSecurityContext(sc *corev1.SecurityContext) bool {
 		}
 	}
 
-	// Check SELinux.
 	if sc.SELinuxOptions != nil {
 		seLinuxOptions := sc.SELinuxOptions
 		if shouldBlockContainerSELinux(seLinuxOptions) {
@@ -296,14 +301,12 @@ func shouldBlockContainerSecurityContext(sc *corev1.SecurityContext) bool {
 		}
 	}
 
-	// Check /proc / Mount Type
 	if sc.ProcMount != nil {
 		if *sc.ProcMount != corev1.DefaultProcMount {
 			return true
 		}
 	}
 
-	// Check Seccomp
 	if sc.SeccompProfile != nil {
 		seccompType := sc.SeccompProfile.Type
 		defaultSeccomp := corev1.SeccompProfileTypeRuntimeDefault
@@ -320,7 +323,7 @@ func shouldBlockContainerSELinux(opts *corev1.SELinuxOptions) bool {
 	if opts == nil {
 		return false
 	}
-	// Check SELinux Type. Must be allowed value or nil/undefined or ""
+
 	fieldName := "Type"
 	value := reflect.ValueOf(opts)
 	field := value.Elem().FieldByName(fieldName)
@@ -361,7 +364,7 @@ func shouldBlockContainerPorts(ports []corev1.ContainerPort) bool {
 	return false
 }
 
-func shouldBlockBaselineCapabilities(capabilities *corev1.Capabilities) (bool) {
+func shouldBlockBaselineCapabilities(capabilities *corev1.Capabilities) bool {
 	fieldName := "Add"
 	value := reflect.ValueOf(capabilities)
 	field := value.Elem().FieldByName(fieldName)
@@ -391,14 +394,27 @@ var (
 )
 
 func init() {
-		err := json.Unmarshal(baselineV126Policy, &baselineV124Rule)
+	err := json.Unmarshal(baselineV126Policy, &baselineV124Rule)
+	if err != nil {
+		panic(err)
+	}
+	err = json.Unmarshal(baselineLatestPolicy, &baselineLatestRule)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, test := range tests {
+		testCases = append(testCases, test...)
+	}
+
+	for _, tc := range testCases {
+		var p *corev1.Pod
+		err = json.Unmarshal(tc.rawPod, &p)
 		if err != nil {
 			panic(err)
 		}
-		err = json.Unmarshal(baselineLatestPolicy, &baselineLatestRule)
-		if err != nil {
-			panic(err)
-		}
+		premadePods = append(premadePods, p)
+	}
 }
 
 func FuzzBaselinePS(f *testing.F) {
@@ -410,9 +426,18 @@ func FuzzBaselinePS(f *testing.F) {
 			return
 		}
 
+		for _, premadePod := range premadePods {
+			if reflect.DeepEqual(premadePod, pod) {
+				panic("ONE SEED")
+			}
+		}
+		return
+
 		var allowPod bool
 		allowPod, _ = shouldAllowBaseline(pod)
-		if allowPod { return }
+		if allowPod {
+			return
+		}
 
 		policyToCheck, err := ff.GetInt()
 		if err != nil {
@@ -421,7 +446,7 @@ func FuzzBaselinePS(f *testing.F) {
 
 		var rule kyvernov1.PodSecurity
 
-		switch policyToCheck%2 {
+		switch policyToCheck % 2 {
 		case 0:
 			rule = baselineV124Rule
 		case 1:
