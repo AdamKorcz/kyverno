@@ -428,6 +428,7 @@ func FuzzBaselinePS(f *testing.F) {
 
 		for _, premadePod := range premadePods {
 			if reflect.DeepEqual(premadePod, pod) {
+				fmt.Println("which pod was it?")
 				panic("ONE SEED")
 			}
 		}
