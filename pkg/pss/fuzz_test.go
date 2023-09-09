@@ -2,7 +2,7 @@ package pss
 
 import (
 	"encoding/json"
-	//"fmt"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -39,10 +39,15 @@ var (
 		"net.ipv4.tcp_syncookies",
 		"net.ipv4.ping_group_range",
 	}
-	baselineOnlyPolicy = []byte(`
+	baselineV124Policy = []byte(`
 		{
 			"level": "baseline",
 			"version": "v1.24"
+		}`)
+	baselineLatestPolicy = []byte(`
+		{
+			"level": "baseline",
+			"version": "latest"
 		}`)
 )
 
@@ -354,14 +359,24 @@ func getPod(ff *fuzz.ConsumeFuzzer) (*corev1.Pod, error) {
 	return pod, err
 }
 
+var (
+	baselineV124Rule, baselineLatestRule kyvernov1.PodSecurity
+)
+
+func init() {
+		err := json.Unmarshal(baselineV124Policy, &baselineV124Rule)
+		if err != nil {
+			panic(err)
+		}
+		err = json.Unmarshal(baselineLatestPolicy, &baselineLatestRule)
+		if err != nil {
+			panic(err)
+		}
+}
+
 func FuzzBaselinePS(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-
 		ff := fuzz.NewConsumer(data)
-		/*policyToCheck, err := ff.GetInt()
-		if err != nil {
-			return
-		}*/
 
 		pod, err := getPod(ff)
 		if err != nil {
@@ -372,14 +387,23 @@ func FuzzBaselinePS(f *testing.F) {
 		allowPod, _ = shouldAllowBaseline(pod)
 		if allowPod { return }
 
-		var rule kyvernov1.PodSecurity
-		err = json.Unmarshal(baselineOnlyPolicy, &rule)
+		policyToCheck, err := ff.GetInt()
 		if err != nil {
-			panic(err)
+			return
+		}
+
+		var rule kyvernov1.PodSecurity
+
+		switch policyToCheck%2 {
+		case 0:
+			rule = baselineV124Rule
+		case 1:
+			rule = baselineLatestRule
 		}
 
 		allowed, _, _ := EvaluatePod(&rule, pod)
 		if allowPod != allowed {
+			fmt.Println("policyToCheck: ", policyToCheck%2)
 			panic("They don't correlate")
 		}
 	})
