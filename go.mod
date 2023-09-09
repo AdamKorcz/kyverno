@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
+	github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230618160516-e936619f9f18
 	github.com/IGLOU-EU/go-wildcard v1.0.3
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/aquilax/truncate v1.0.0
