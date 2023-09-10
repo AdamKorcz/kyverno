@@ -10,8 +10,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	fuzz "github.com/AdamKorcz/go-fuzz-headers-1"
 	"github.com/AdamKorcz/go-118-fuzz-build/testing"
+	fuzz "github.com/AdamKorcz/go-fuzz-headers-1"
 	"golang.org/x/exp/slices"
 )
 
@@ -425,7 +425,35 @@ func FuzzBaselinePS(f *testing.F) {
 		if err != nil {
 			return
 		}
+		if len(pod.Spec.Containers) == 0 {
+			return
+		}
+		for _, container := range pod.Spec.Containers {
+			if strings.Contains(container.Name, "n") {
+				if strings.Contains(container.Name, "ng") {
+					if strings.Contains(container.Name, "ngi") {
+						if strings.Contains(container.Name, "ngin") {
+							if strings.Contains(container.Name, "nginx") {
+								goto CHECKPREMADE
+							}
+						}
 
+					}
+
+				}
+			}
+		}
+		if pod.Spec.SecurityContext != nil {
+			if pod.Spec.SecurityContext.SeccompProfile != nil {
+				if pod.Spec.SecurityContext.SeccompProfile != nil {
+					if pod.Spec.SecurityContext.SeccompProfile.Type != "" {
+						goto CHECKPREMADE
+					}
+				}
+			}
+		}
+		return
+	CHECKPREMADE:
 		for _, premadePod := range premadePods {
 			if reflect.DeepEqual(premadePod, pod) {
 				fmt.Println("which pod was it?")
