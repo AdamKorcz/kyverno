@@ -19,12 +19,18 @@ compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v1 FuzzV1MatchRe
 compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v1 FuzzV1ClusterPolicy FuzzV2beta1ClusterPolicy
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzVerifyImageAndPatchTest FuzzVerifyImageAndPatchTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzEngineValidateTest FuzzEngineValidateTest
-compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzContainerNameTest FuzzContainerNameTest
+compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzPodBypass FuzzPodBypass
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine FuzzMutateTest FuzzMutateTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/validation/policy FuzzValidatePolicy FuzzValidatePolicy
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine/anchor FuzzAnchorParseTest FuzzAnchorParseTest
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine/api FuzzEngineResponse FuzzEngineResponse
+compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/pss FuzzBaselinePS FuzzBaselinePS
 
 cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzEngineValidateTest.dict
 cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzMutateTest.dict
 cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzVerifyImageAndPatchTest.dict
+
+zip $OUT/FuzzBaselinePS_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzBaselinePS_seed1
+zip $OUT/FuzzPodBypass_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzPodBypass_seed1
+
+cp $SRC/kyverno/test/fuzz/options/* $OUT/
