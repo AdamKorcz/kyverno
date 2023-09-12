@@ -5,41 +5,17 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"testing"
 
 	kyvernov1 "github.com/kyverno/kyverno/api/kyverno/v1"
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/AdamKorcz/go-118-fuzz-build/testing"
 	fuzz "github.com/AdamKorcz/go-fuzz-headers-1"
 	"golang.org/x/exp/slices"
 )
 
 var (
-	testCases	= []testCase{}
-	tests		= [][]testCase{
-		baseline_hostProcess,
-
-		baseline_privileged,
-		baseline_capabilities,
-		baseline_hostPath_volumes,
-		baseline_host_ports,
-		baseline_appArmor,
-		baseline_seLinux,
-		baseline_procMount,
-		baseline_seccompProfile,
-		baseline_sysctls,
-		restricted_volume_types,
-		restricted_privilege_escalation,
-		restricted_runAsNonRoot,
-		restricted_runAsUser,
-		restricted_seccompProfile,
-		restricted_capabilities,
-		wildcard_images,
-	}
-
-	premadePods	[]*corev1.Pod
-
 	allowedCapabilities	= []corev1.Capability{"AUDIT_WRITE",
 		"CHOWN",
 		"DAC_OVERRIDE",
@@ -130,7 +106,6 @@ func shouldAllowBaseline(pod *corev1.Pod) (bool, error) {
 		for k, v := range annotations {
 			if strings.HasPrefix(k, "container.apparmor.security.beta.kubernetes.io/") {
 				if v != "runtime/default" && !strings.HasPrefix(v, "localhost/") {
-					fmt.Println("VVVVVVVVVVVVVVVVVVVVVVVV", v)
 					return false, nil
 				}
 			}
@@ -402,19 +377,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	for _, test := range tests {
-		testCases = append(testCases, test...)
-	}
-
-	for _, tc := range testCases {
-		var p *corev1.Pod
-		err = json.Unmarshal(tc.rawPod, &p)
-		if err != nil {
-			panic(err)
-		}
-		premadePods = append(premadePods, p)
-	}
 }
 
 func FuzzBaselinePS(f *testing.F) {
@@ -425,42 +387,6 @@ func FuzzBaselinePS(f *testing.F) {
 		if err != nil {
 			return
 		}
-		if len(pod.Spec.Containers) == 0 {
-			return
-		}
-		for _, container := range pod.Spec.Containers {
-			if strings.Contains(container.Name, "n") {
-				if strings.Contains(container.Name, "ng") {
-					if strings.Contains(container.Name, "ngi") {
-						if strings.Contains(container.Name, "ngin") {
-							if strings.Contains(container.Name, "nginx") {
-								goto CHECKPREMADE
-							}
-						}
-
-					}
-
-				}
-			}
-		}
-		if pod.Spec.SecurityContext != nil {
-			if pod.Spec.SecurityContext.SeccompProfile != nil {
-				if pod.Spec.SecurityContext.SeccompProfile != nil {
-					if pod.Spec.SecurityContext.SeccompProfile.Type != "" {
-						goto CHECKPREMADE
-					}
-				}
-			}
-		}
-		return
-	CHECKPREMADE:
-		for _, premadePod := range premadePods {
-			if reflect.DeepEqual(premadePod, pod) {
-				fmt.Println("which pod was it?")
-				panic("ONE SEED")
-			}
-		}
-		return
 
 		var allowPod bool
 		allowPod, _ = shouldAllowBaseline(pod)
