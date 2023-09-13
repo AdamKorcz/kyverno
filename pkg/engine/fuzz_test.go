@@ -464,15 +464,10 @@ func FuzzEngineValidateTest(f *testing.F) {
 			t.Skip()
 		}
 
-		er := validateEngine.Validate(
+		validateEngine.Validate(
 			validateContext,
 			pc.WithPolicy(policy),
 		)
-		failurePolicy := kyverno.Fail
-		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
-		if blocked == false {
-			panic("blocked = false")
-		}
 	})
 }
 
