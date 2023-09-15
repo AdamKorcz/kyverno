@@ -388,6 +388,21 @@ func FuzzBaselinePS(f *testing.F) {
 			return
 		}
 
+		if len(pod.ObjectMeta.Annotations) > 0 {
+			for k, v := range pod.ObjectMeta.Annotations {
+				for _, r := range k {
+			        if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && (r != '-' && r != '/' && r != '_' && r != ',' && r != '.') {
+			        	return
+			        }
+			    }
+				for _, r := range v {
+			        if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && (r != '-' && r != '/' && r != '_' && r != ',' && r != '.') {
+			        	return
+			        }
+			    }
+			}
+		}
+
 		var allowPod bool
 		allowPod, _ = shouldAllowBaseline(pod)
 		if allowPod {
@@ -410,7 +425,13 @@ func FuzzBaselinePS(f *testing.F) {
 
 		allowed, _, _ := EvaluatePod(&rule, pod)
 		if allowPod != allowed {
+			pJson, err := json.MarshalIndent(pod, "", "")
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println(string(pJson))
 			fmt.Println("policyToCheck: ", policyToCheck%2)
+			fmt.Println("allowed: ", allowed, "allowPod: ", allowPod)
 			panic("They don't correlate")
 		}
 	})
