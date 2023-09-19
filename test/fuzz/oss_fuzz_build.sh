@@ -3,7 +3,7 @@
 # This script is only meant to be run by OSS-Fuzz.
 # OSS-Fuzz uses this script to compile kyvernos fuzzers
 
-go mod edit -replace github.com/AdaLogics/go-fuzz-headers=github.com/AdamKorcz/go-fuzz-headers-1@9f598545f62c14ac4d4d5d1f1a99057342100d09
+go mod edit -replace github.com/AdaLogics/go-fuzz-headers=github.com/AdamKorcz/go-fuzz-headers-1@7bca1710ef6d1c1e39a3d716a43af5f265a01406
 # Needed by OSS-Fuzz:
 printf "package engine\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > $SRC/kyverno/pkg/engine/registerfuzzdep.go
 go mod tidy
@@ -30,7 +30,7 @@ cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzEngineValidateTest.dic
 cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzMutateTest.dict
 cp $SRC/kyverno/test/fuzz/dictionaries/fuzz.dict $OUT/FuzzVerifyImageAndPatchTest.dict
 
-zip $OUT/FuzzBaselinePS_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzBaselinePS_seed1
-zip $OUT/FuzzPodBypass_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzPodBypass_seed1
+zip $OUT/FuzzBaselinePS_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzBaselinePS_seed*
+zip $OUT/FuzzPodBypass_seed_corpus.zip $SRC/kyverno/test/fuzz/seeds/FuzzPodBypass_seed*
 
 cp $SRC/kyverno/test/fuzz/options/* $OUT/
