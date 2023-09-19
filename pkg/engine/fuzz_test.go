@@ -1340,6 +1340,7 @@ func FuzzPodBypass(f *testing.F) {
 		blocked := blockRequest([]engineapi.EngineResponse{er}, failurePolicy)
 		if blocked != shouldBlock {
 			fmt.Println("er:::::::::::::: ", er)
+			fmt.Println("Kyverno rule: ", policyToCheck%11)
 			panic(fmt.Sprintf("\nDid not block a resource that should be blocked:\n%s\n should have been blocked by \n%+v\n\nshouldBlock was %t\nblocked was %t\n", string(resource), checker.clusterPolicy, shouldBlock, blocked))
 		}
 	})
