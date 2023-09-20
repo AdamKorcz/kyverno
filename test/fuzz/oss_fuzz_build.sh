@@ -10,7 +10,7 @@ go mod tidy
 
 
 echo "1"
-compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/utils/api FuzzJmesPath FuzzJmesPath
+compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/utils/api FuzzJmespath FuzzJmespath
 echo "2"
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine/variables FuzzEvaluate FuzzEvaluate
 echo "3"
