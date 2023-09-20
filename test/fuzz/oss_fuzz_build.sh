@@ -8,6 +8,7 @@ go mod edit -replace github.com/AdaLogics/go-fuzz-headers=github.com/AdamKorcz/g
 printf "package engine\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > $SRC/kyverno/pkg/engine/registerfuzzdep.go
 go mod tidy
 
+compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/utils/api FuzzJmesPath FuzzJmesPath
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/engine/variables FuzzEvaluate FuzzEvaluate
 compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v2beta1 FuzzV2beta1PolicyValidate FuzzV2beta1PolicyValidate
 compile_native_go_fuzzer github.com/kyverno/kyverno/api/kyverno/v2beta1 FuzzV2beta1ImageVerification FuzzV2beta1ImageVerification
