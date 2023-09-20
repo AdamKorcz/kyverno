@@ -6,11 +6,11 @@ import (
 	"github.com/kyverno/kyverno/pkg/config"
 )
 
-var cfg = config.NewDefaultConfiguration(false)
+var fuzzCfg = config.NewDefaultConfiguration(false)
 
 func FuzzJmespath(f *testing.F) {
 	f.Fuzz(func(t *testing.T, jmsString, value string) {
-		jp := jmespath.New(cfg)
+		jp := jmespath.New(fuzzCfg)
 		q, err := jp.Query(jmsString)
 		if err != nil {
 			return
