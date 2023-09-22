@@ -8,6 +8,17 @@ go mod edit -replace github.com/AdaLogics/go-fuzz-headers=github.com/AdamKorcz/g
 printf "package engine\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > $SRC/kyverno/pkg/engine/registerfuzzdep.go
 go mod tidy
 
+cd $SRC/
+git clone --depth=1 https://github.com/AdamKorcz/kyverno-go-jmespath
+cd kyverno-go-jmespath
+wget https://github.com/kyverno/go-jmespath/pull/13.diff
+wget https://github.com/kyverno/go-jmespath/pull/12.diff
+git apply 13.diff
+git apply 12.diff
+
+cd $SRC/kyverno
+go mod edit -replace github.com/kyverno/go-jmespath=$SRC/kyverno-go-jmespath
+go mod tidy
 
 echo "1"
 compile_native_go_fuzzer github.com/kyverno/kyverno/pkg/utils/api FuzzJmespath FuzzJmespath
