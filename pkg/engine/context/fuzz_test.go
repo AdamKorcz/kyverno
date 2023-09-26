@@ -1,8 +1,12 @@
 package context
 
 import (
-	"testing"
 	admissionv1 "k8s.io/api/admission/v1"
+	"testing"
+)
+
+var (
+	fuzzJp = jmespath.New(config.NewDefaultConfiguration(false))
 )
 
 func FuzzHasChanged(f *testing.F) {
@@ -18,7 +22,7 @@ func createFuzzContext(obj, oldObj string) Interface {
 	request.Object.Raw = []byte(obj)
 	request.OldObject.Raw = []byte(oldObj)
 
-	ctx := NewContext(jp)
+	ctx := NewContext(fuzzJp)
 	ctx.AddRequest(request)
 	return ctx
 }
