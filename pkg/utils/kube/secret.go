@@ -16,7 +16,7 @@ func RedactSecret(resource *unstructured.Unstructured) (unstructured.Unstructure
 	if err != nil {
 		return *resource, err
 	}
-	err = json.Unmarshal(data, &secret)
+	err = json.Unmarshal(data, secret)
 	if err != nil {
 		return *resource, fmt.Errorf("unable to convert object to secret: %w", err)
 	}

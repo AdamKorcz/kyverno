@@ -11,13 +11,13 @@ import (
 func UnmarshalCleanupPolicy(kind string, raw []byte) (kyvernov2alpha1.CleanupPolicyInterface, error) {
 	if kind == "CleanupPolicy" {
 		var policy *kyvernov2alpha1.CleanupPolicy
-		if err := json.Unmarshal(raw, &policy); err != nil {
+		if err := json.Unmarshal(raw, policy); err != nil {
 			return nil, err
 		}
 		return policy, nil
 	} else if kind == "ClusterCleanupPolicy" {
 		var policy *kyvernov2alpha1.ClusterCleanupPolicy
-		if err := json.Unmarshal(raw, &policy); err != nil {
+		if err := json.Unmarshal(raw, policy); err != nil {
 			return nil, err
 		}
 		return policy, nil

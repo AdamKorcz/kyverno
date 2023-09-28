@@ -9,7 +9,7 @@ import (
 
 func UnmarshalPartialObjectMetadata(raw []byte) (*metav1.PartialObjectMetadata, error) {
 	var object *metav1.PartialObjectMetadata
-	if err := json.Unmarshal(raw, &object); err != nil {
+	if err := json.Unmarshal(raw, object); err != nil {
 		return nil, err
 	}
 	return object, nil

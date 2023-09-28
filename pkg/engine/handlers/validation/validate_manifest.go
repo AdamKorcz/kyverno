@@ -82,7 +82,7 @@ func (h validateManifestHandler) verifyManifest(
 	}
 	reqByte, _ := json.Marshal(request)
 	var adreq *admissionv1.AdmissionRequest
-	err = json.Unmarshal(reqByte, &adreq)
+	err = json.Unmarshal(reqByte, adreq)
 	if err != nil {
 		return false, "", fmt.Errorf("failed to unmarshal a request from requestByte: %w", err)
 	}

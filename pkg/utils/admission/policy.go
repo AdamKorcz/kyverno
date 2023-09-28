@@ -11,13 +11,13 @@ import (
 func UnmarshalPolicy(kind string, raw []byte) (kyvernov1.PolicyInterface, error) {
 	if kind == "ClusterPolicy" {
 		var policy *kyvernov1.ClusterPolicy
-		if err := json.Unmarshal(raw, &policy); err != nil {
+		if err := json.Unmarshal(raw, policy); err != nil {
 			return nil, err
 		}
 		return policy, nil
 	} else if kind == "Policy" {
 		var policy *kyvernov1.Policy
-		if err := json.Unmarshal(raw, &policy); err != nil {
+		if err := json.Unmarshal(raw, policy); err != nil {
 			return nil, err
 		}
 		return policy, nil
